@@ -79,7 +79,7 @@ async def main():
     print("QUICK TEST: A2A AGENTS")
     print("=" * 80)
     print("\nThis script tests both agents to ensure they're working correctly.")
-    print("Make sure Ollama is running with the gemma2:2b model installed.\n")
+    print("Make sure Ollama is running with the gemma3:latest model installed.\n")
 
     # Test both agents
     results = []
@@ -98,7 +98,7 @@ async def main():
         print("✗ Some tests failed. Please check the errors above.")
         print("\nMake sure:")
         print("  1. Ollama is running (ollama serve)")
-        print("  2. gemma2:2b model is installed (ollama pull gemma2:2b)")
+        print("  2. gemma3:latest model is installed (ollama pull gemma3:latest)")
         print("  3. All dependencies are installed (pip install -r requirements.txt)")
 
     print("=" * 80 + "\n")

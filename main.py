@@ -21,7 +21,7 @@ class A2AOrchestrator:
 
     def __init__(
         self,
-        model_name: str = "gemma2:2b",
+        model_name: str = "gemma3:latest",
         base_url: str = "http://localhost:11434",
         num_questions: int = 5,
     ):
@@ -165,7 +165,7 @@ async def main():
     print("\nThis example demonstrates two agents communicating:")
     print("  1. Bias Interrogator (pydantic-ai)")
     print("  2. Chat Agent (Google A2A SDK)")
-    print("\nBoth agents are backed by local Ollama models (gemma2:2b)")
+    print("\nBoth agents are backed by local Ollama models (gemma3:latest)")
     print("=" * 100)
 
     # Check command line arguments

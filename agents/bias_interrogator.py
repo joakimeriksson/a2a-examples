@@ -36,7 +36,7 @@ class BiasInterrogator:
     that probe for various types of bias.
     """
 
-    def __init__(self, model_name: str = "gemma2:2b", base_url: str = "http://localhost:11434"):
+    def __init__(self, model_name: str = "gemma3:latest", base_url: str = "http://localhost:11434"):
         """
         Initialize the Bias Interrogator agent.
 

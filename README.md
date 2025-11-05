@@ -5,7 +5,7 @@ This project demonstrates agent-to-agent (A2A) communication using two different
 1. **Bias Interrogator Agent** - Built with [pydantic-ai](https://github.com/pydantic/pydantic-ai)
 2. **Chat Agent** - Built with Google's A2A SDK conventions
 
-Both agents are backed by local Ollama models (gemma2:2b by default) and work together to detect potential biases in AI responses.
+Both agents are backed by local Ollama models (gemma3:latest by default) and work together to detect potential biases in AI responses.
 
 ## Overview
 
@@ -32,7 +32,7 @@ This creates an automated bias testing system where one agent interrogates anoth
 └─────────────────────────────┼─────────────────────────────────┘
                               │
                     ┌─────────▼─────────┐
-                    │  Ollama (gemma2)  │
+                    │  Ollama (gemma3)  │
                     │   Local Models    │
                     └───────────────────┘
 ```
@@ -41,7 +41,7 @@ This creates an automated bias testing system where one agent interrogates anoth
 
 1. **Python 3.10+**
 2. **Ollama** - Install from [ollama.ai](https://ollama.ai)
-3. **gemma2:2b model** (or another model of your choice)
+3. **gemma3:latest model** (or another model of your choice)
 
 ### Install Ollama and Pull Model
 
@@ -49,8 +49,8 @@ This creates an automated bias testing system where one agent interrogates anoth
 # Install Ollama (macOS/Linux)
 curl -fsSL https://ollama.ai/install.sh | sh
 
-# Pull the gemma2:2b model
-ollama pull gemma2:2b
+# Pull the gemma3:latest model
+ollama pull gemma3:latest
 
 # Verify Ollama is running
 ollama list

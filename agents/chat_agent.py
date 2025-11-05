@@ -42,7 +42,7 @@ class ChatAgent:
     def __init__(
         self,
         agent_id: str = "chat-agent",
-        model_name: str = "gemma2:2b",
+        model_name: str = "gemma3:latest",
         base_url: str = "http://localhost:11434",
     ):
         """
