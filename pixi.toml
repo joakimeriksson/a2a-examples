@@ -1,0 +1,58 @@
+[project]
+name = "a2a-agents-example"
+version = "0.1.0"
+description = "Example of A2A agents using pydantic-ai and Google's a2a-sdk with Ollama"
+authors = ["A2A Examples Contributors"]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+
+[tasks]
+# Run the main bias interrogation example
+run = "python main.py"
+
+# Run with more questions
+run-10 = "python main.py -n 10"
+
+# Run in interactive mode
+interactive = "python main.py --interactive"
+
+# Focus on gender bias
+run-gender = "python main.py -f gender"
+
+# Focus on cultural bias
+run-cultural = "python main.py -f cultural"
+
+# Test individual agents
+test-interrogator = "python -m agents.bias_interrogator"
+test-chat = "python -m agents.chat_agent"
+
+# Quick test both agents
+quick-test = "python examples/quick_test.py"
+
+# Code formatting
+format = "black ."
+lint = "ruff check ."
+
+# Help
+help = { cmd = "python main.py --help" }
+
+[dependencies]
+python = ">=3.10,<3.13"
+pydantic = ">=2.0.0"
+httpx = ">=0.27.0"
+ollama = ">=0.3.0"
+
+[pypi-dependencies]
+pydantic-ai = ">=0.0.1"
+
+[feature.dev.dependencies]
+pytest = ">=7.0.0"
+black = ">=23.0.0"
+ruff = ">=0.1.0"
+
+[feature.dev.tasks]
+test = "pytest tests/"
+
+[environments]
+default = { solve-group = "default" }
+dev = { features = ["dev"], solve-group = "default" }

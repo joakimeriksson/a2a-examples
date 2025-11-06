@@ -58,6 +58,30 @@ ollama list
 
 ## Installation
 
+### Option 1: Using Pixi (Recommended)
+
+[Pixi](https://pixi.sh) is a modern package manager that handles dependencies and environments automatically.
+
+1. Install Pixi:
+```bash
+# macOS/Linux
+curl -fsSL https://pixi.sh/install.sh | bash
+
+# Windows (PowerShell)
+iwr -useb https://pixi.sh/install.ps1 | iex
+```
+
+2. Clone the repository and install:
+```bash
+git clone <repository-url>
+cd a2a-examples
+pixi install
+```
+
+That's it! Pixi will automatically create an environment and install all dependencies.
+
+### Option 2: Using pip
+
 1. Clone the repository:
 ```bash
 git clone <repository-url>
@@ -82,18 +106,31 @@ pip install -r requirements.txt
 Run the automated bias testing session with 5 questions:
 
 ```bash
+# Using pixi
+pixi run run
+
+# Or using python directly
 python main.py
 ```
 
 Generate more questions:
 
 ```bash
+# Using pixi
+pixi run run-10
+
+# Or using python directly
 python main.py -n 10
 ```
 
 Focus on a specific type of bias:
 
 ```bash
+# Using pixi
+pixi run run-gender
+pixi run run-cultural
+
+# Or using python directly
 python main.py -f gender
 python main.py -f cultural
 python main.py -f age
@@ -104,6 +141,10 @@ python main.py -f age
 Run in interactive mode to ask your own questions:
 
 ```bash
+# Using pixi
+pixi run interactive
+
+# Or using python directly
 python main.py --interactive
 ```
 
@@ -136,12 +177,29 @@ You can also test each agent independently:
 
 #### Test Bias Interrogator:
 ```bash
+# Using pixi
+pixi run test-interrogator
+
+# Or using python directly
 python -m agents.bias_interrogator
 ```
 
 #### Test Chat Agent:
 ```bash
+# Using pixi
+pixi run test-chat
+
+# Or using python directly
 python -m agents.chat_agent
+```
+
+#### Quick Test (Both Agents):
+```bash
+# Using pixi
+pixi run quick-test
+
+# Or using python directly
+python examples/quick_test.py
 ```
 
 ## Project Structure
@@ -152,11 +210,16 @@ a2a-examples/
 │   ├── __init__.py              # Package initialization
 │   ├── bias_interrogator.py    # Bias interrogator agent (pydantic-ai)
 │   └── chat_agent.py            # Chat agent (A2A SDK)
+├── examples/
+│   ├── __init__.py              # Examples package
+│   └── quick_test.py            # Quick test script
 ├── main.py                      # Main orchestration script
-├── requirements.txt             # Python dependencies
-├── pyproject.toml              # Project configuration
-├── .gitignore                  # Git ignore rules
-└── README.md                   # This file
+├── pixi.toml                    # Pixi configuration (recommended)
+├── requirements.txt             # Python dependencies (pip)
+├── pyproject.toml               # Project configuration
+├── .gitignore                   # Git ignore rules
+├── LICENSE                      # MIT License
+└── README.md                    # This file
 ```
 
 ## How It Works
@@ -250,16 +313,56 @@ By default, the agents connect to Ollama at `http://localhost:11434`. If you're 
 
 ## Development
 
-### Running Tests
+### Using Pixi for Development
+
+Pixi includes a `dev` environment with additional development tools:
 
 ```bash
-pytest tests/
+# Install with dev dependencies
+pixi install --environment dev
+
+# Run tests
+pixi run -e dev test
+
+# Format code
+pixi run -e dev format
+
+# Lint code
+pixi run -e dev lint
 ```
 
-### Code Formatting
+### Available Pixi Tasks
+
+View all available tasks:
+```bash
+pixi task list
+```
+
+Common tasks:
+- `pixi run run` - Run main example (5 questions)
+- `pixi run run-10` - Run with 10 questions
+- `pixi run interactive` - Interactive mode
+- `pixi run run-gender` - Focus on gender bias
+- `pixi run run-cultural` - Focus on cultural bias
+- `pixi run quick-test` - Quick test both agents
+- `pixi run test-interrogator` - Test bias interrogator only
+- `pixi run test-chat` - Test chat agent only
+- `pixi run format` - Format code with black
+- `pixi run lint` - Lint code with ruff
+- `pixi run help` - Show help message
+
+### Using pip for Development
+
+If you prefer pip:
 
 ```bash
+# Run tests
+pytest tests/
+
+# Format code
 black .
+
+# Lint code
 ruff check .
 ```
 
