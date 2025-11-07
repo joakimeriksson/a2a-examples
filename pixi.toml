@@ -8,33 +8,33 @@ platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
 
 [tasks]
 # Run the main bias interrogation example
-run = "python main.py"
+run = "python bias-agents/main.py"
 
 # Run with more questions
-run-10 = "python main.py -n 10"
+run-10 = "python bias-agents/main.py -n 10"
 
 # Run in interactive mode
-interactive = "python main.py --interactive"
+interactive = "python bias-agents/main.py --interactive"
 
 # Focus on gender bias
-run-gender = "python main.py -f gender"
+run-gender = "python bias-agents/main.py -f gender"
 
 # Focus on cultural bias
-run-cultural = "python main.py -f cultural"
+run-cultural = "python bias-agents/main.py -f cultural"
 
 # Test individual agents
-test-interrogator = "python -m agents.bias_interrogator"
-test-chat = "python -m agents.chat_agent"
+test-interrogator = { cmd = "python -m agents.bias_interrogator", cwd = "bias-agents" }
+test-chat = { cmd = "python -m agents.chat_agent", cwd = "bias-agents" }
 
 # Quick test both agents
-quick-test = "python examples/quick_test.py"
+quick-test = "python bias-agents/examples/quick_test.py"
 
 # Code formatting
 format = "black ."
 lint = "ruff check ."
 
 # Help
-help = { cmd = "python main.py --help" }
+help = { cmd = "python bias-agents/main.py --help" }
 
 [dependencies]
 python = ">=3.10,<3.13"
