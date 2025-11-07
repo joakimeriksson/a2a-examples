@@ -16,6 +16,17 @@ Both agents communicate using local Ollama models to create an automated bias te
 
 [View detailed documentation →](./bias-agents/README.md)
 
+### [Face Recognition Agent](./face_recognition/)
+
+Webcam-based face recognition with A2A capabilities:
+- **Face Recognition Agent** - Uses DeepFace for face detection and recognition
+- **Person Database** - Stores face encodings, photos, and metadata
+- **A2A Server** - HTTP server exposing the agent to other agents
+
+The agent can recognize people via webcam and respond to queries from other agents about person information, interests, and preferences.
+
+[View detailed documentation →](./face_recognition/README.md)
+
 ## Quick Start
 
 Each example is self-contained and can be run independently. Navigate to the example folder and follow its README.
@@ -23,14 +34,14 @@ Each example is self-contained and can be run independently. Navigate to the exa
 ### Prerequisites
 
 1. **Python 3.10+**
-2. **Ollama** - Install from [ollama.ai](https://ollama.ai)
-3. **Model for the example** (e.g., gemma3:latest)
+2. **Ollama** - Install from [ollama.ai](https://ollama.ai) (required for bias-agents, optional for face-recognition)
+3. **Webcam** - Required for face-recognition example
 
 ```bash
-# Install Ollama
+# Install Ollama (for bias-agents example)
 curl -fsSL https://ollama.ai/install.sh | sh
 
-# Pull the model
+# Pull a model
 ollama pull gemma3:latest
 ```
 
@@ -56,6 +67,26 @@ python main.py
 
 For more options and detailed usage, see the [bias-agents README](./bias-agents/README.md).
 
+### Running the Face Recognition Example
+
+#### Using Pixi (Recommended)
+
+```bash
+# From the project root
+pixi install
+pixi run face-recognition
+```
+
+#### Using pip
+
+```bash
+cd face_recognition
+pip install -r requirements.txt
+python face_recognition_agent.py
+```
+
+For more options and detailed usage, see the [face-recognition README](./face_recognition/README.md).
+
 ## Project Structure
 
 ```
@@ -67,6 +98,15 @@ a2a-examples/
 │   ├── pixi.toml        # Pixi configuration
 │   ├── requirements.txt  # Python dependencies
 │   └── README.md        # Detailed documentation
+├── face_recognition/      # Face recognition agent example
+│   ├── face_recognition_agent.py  # Main agent
+│   ├── server.py         # A2A HTTP server
+│   ├── client_example.py # Client examples
+│   ├── example_usage.py  # Demo scripts
+│   ├── requirements.txt  # Specific dependencies
+│   └── README.md        # Detailed documentation
+├── pixi.toml             # Root pixi configuration
+├── requirements.txt      # Root dependencies
 ├── LICENSE               # MIT License
 └── README.md            # This file
 ```
@@ -77,10 +117,17 @@ Contributions are welcome! Feel free to add new A2A examples or improve existing
 
 When adding a new example:
 1. Create a new folder at the root level
-2. Include a complete `pixi.toml`, `requirements.txt`, and `README.md`
+2. Include a complete `pixi.toml` (optional), `requirements.txt`, and `README.md`
 3. Make the example self-contained with all necessary dependencies
 4. Update this README to list your example
 
 ## License
 
 MIT License - See LICENSE file for details
+
+## Acknowledgments
+
+- [pydantic-ai](https://github.com/pydantic/pydantic-ai) - Framework for building agents with Pydantic
+- [DeepFace](https://github.com/serengil/deepface) - Deep learning face recognition library
+- [Ollama](https://ollama.ai) - Local LLM runtime
+- Google A2A SDK - Agent-to-Agent communication protocol
