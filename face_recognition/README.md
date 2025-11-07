@@ -60,10 +60,8 @@ A webcam-based face recognition agent that can identify people, store their info
 
 ### Using Pixi (Recommended)
 
-The dependencies are already included in the main `pixi.toml`. Simply run:
-
 ```bash
-cd a2a-examples
+cd face_recognition
 pixi install
 ```
 
@@ -76,12 +74,6 @@ cd face_recognition
 pip install -r requirements.txt
 ```
 
-Or from the main directory:
-
-```bash
-pip install opencv-python deepface tf-keras pillow numpy httpx pydantic
-```
-
 ## Quick Start
 
 ### 1. Basic Face Recognition
@@ -89,11 +81,13 @@ pip install opencv-python deepface tf-keras pillow numpy httpx pydantic
 Run the agent in interactive mode:
 
 ```bash
-# From the face_recognition directory
-python face_recognition_agent.py
+cd face_recognition
 
-# Or using Python module syntax from project root
-python -m face_recognition.face_recognition_agent
+# Using pixi
+pixi run run
+
+# Or using python directly
+python face_recognition_agent.py
 ```
 
 This will:
@@ -108,6 +102,12 @@ This will:
 Run the comprehensive example:
 
 ```bash
+cd face_recognition
+
+# Using pixi
+pixi run examples
+
+# Or using python directly
 python example_usage.py
 ```
 
@@ -115,13 +115,6 @@ This provides several demos:
 - Basic face recognition
 - A2A protocol queries
 - Agent-to-agent interaction simulation
-
-### 3. Run from Project Root
-
-```bash
-cd a2a-examples
-python -m face_recognition.example_usage
-```
 
 ## Usage Guide
 

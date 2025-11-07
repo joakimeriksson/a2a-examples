@@ -1,0 +1,54 @@
+[project]
+name = "face-recognition-agent"
+version = "0.1.0"
+description = "Webcam-based face recognition agent with A2A protocol support"
+authors = ["A2A Examples Contributors"]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+
+[tasks]
+# Run the face recognition agent
+run = "python face_recognition_agent.py"
+
+# Start the A2A HTTP server
+server = "python server.py"
+
+# Run the client demo
+client = "python client_example.py"
+
+# Run the interactive client
+client-interactive = "python client_example.py --interactive"
+
+# Run example demos
+examples = "python example_usage.py"
+
+# Code formatting
+format = "black ."
+lint = "ruff check ."
+
+# Help
+help = { cmd = "python face_recognition_agent.py --help" }
+
+[dependencies]
+python = ">=3.10,<3.13"
+numpy = ">=1.24.0"
+pillow = ">=10.0.0"
+httpx = ">=0.27.0"
+pydantic = ">=2.0.0"
+
+[pypi-dependencies]
+opencv-python = ">=4.8.0"
+deepface = ">=0.0.79"
+tf-keras = ">=2.16.0"
+
+[feature.dev.dependencies]
+pytest = ">=7.0.0"
+black = ">=23.0.0"
+ruff = ">=0.1.0"
+
+[feature.dev.tasks]
+test = "pytest tests/"
+
+[environments]
+default = { solve-group = "default" }
+dev = { features = ["dev"], solve-group = "default" }
