@@ -2,6 +2,8 @@
 
 A collection of Agent-to-Agent (A2A) communication examples demonstrating different frameworks and use cases.
 
+Each example is self-contained with its own dependencies, configuration, and documentation.
+
 ## Examples
 
 ### [Bias Agents](./bias-agents/)
@@ -16,11 +18,13 @@ Both agents communicate using local Ollama models to create an automated bias te
 
 ## Quick Start
 
+Each example is self-contained and can be run independently. Navigate to the example folder and follow its README.
+
 ### Prerequisites
 
 1. **Python 3.10+**
 2. **Ollama** - Install from [ollama.ai](https://ollama.ai)
-3. **gemma3:latest model**
+3. **Model for the example** (e.g., gemma3:latest)
 
 ```bash
 # Install Ollama
@@ -30,36 +34,24 @@ curl -fsSL https://ollama.ai/install.sh | sh
 ollama pull gemma3:latest
 ```
 
-### Installation
+### Running the Bias Agents Example
 
 #### Using Pixi (Recommended)
 
 ```bash
-# Install Pixi
-curl -fsSL https://pixi.sh/install.sh | bash
-
-# Install dependencies
+cd bias-agents
 pixi install
+pixi run run
 ```
 
 #### Using pip
 
 ```bash
+cd bias-agents
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r bias-agents/requirements.txt
-```
-
-## Running Examples
-
-### Bias Agents Example
-
-```bash
-# Using pixi
-pixi run run
-
-# Or using python directly
-python bias-agents/main.py
+pip install -r requirements.txt
+python main.py
 ```
 
 For more options and detailed usage, see the [bias-agents README](./bias-agents/README.md).
@@ -72,14 +64,22 @@ a2a-examples/
 │   ├── agents/           # Agent implementations
 │   ├── examples/         # Example scripts
 │   ├── main.py          # Main orchestrator
+│   ├── pixi.toml        # Pixi configuration
+│   ├── requirements.txt  # Python dependencies
 │   └── README.md        # Detailed documentation
-├── pixi.toml            # Pixi configuration
+├── LICENSE               # MIT License
 └── README.md            # This file
 ```
 
 ## Contributing
 
 Contributions are welcome! Feel free to add new A2A examples or improve existing ones.
+
+When adding a new example:
+1. Create a new folder at the root level
+2. Include a complete `pixi.toml`, `requirements.txt`, and `README.md`
+3. Make the example self-contained with all necessary dependencies
+4. Update this README to list your example
 
 ## License
 
