@@ -6,8 +6,10 @@ A webcam-based face recognition agent that can identify people, store their info
 
 - **Real-time Face Recognition**: Uses webcam to detect and recognize people
 - **Deep Learning Model**: Powered by DeepFace with multiple backend options (Facenet512, VGG-Face, ArcFace, etc.)
+- **Speech Recognition**: Collect information via voice input using Google Speech Recognition, Whisper, or Sphinx
+- **Text-to-Speech**: Audio prompts for hands-free interaction
 - **Persistent Storage**: Stores face encodings, photos, and metadata on disk
-- **Interactive Information Collection**: Asks questions to gather information about people
+- **Interactive Information Collection**: Asks questions to gather information about people (via speech or text)
 - **A2A Protocol Support**: Other agents can query person information and request additional questions
 - **Dynamic Question Collection**: Agents can request specific information to be collected when people are recognized
 
@@ -53,8 +55,9 @@ A webcam-based face recognition agent that can identify people, store their info
 
 1. **Python 3.10+**
 2. **Webcam** - Required for face recognition
-3. **Ollama** (Optional) - For natural language processing tasks
-4. **GPU** (Optional but recommended) - For faster face recognition
+3. **Microphone** - Required for speech recognition (optional feature)
+4. **Ollama** (Optional) - For natural language processing tasks
+5. **GPU** (Optional but recommended) - For faster face recognition
 
 ## Installation
 
@@ -123,8 +126,8 @@ This provides several demos:
 1. Start the face recognition agent
 2. Look at the webcam
 3. When a face is detected (red box), press 's' to save
-4. Enter the person's name when prompted
-5. Answer any pending questions (default: just name)
+4. **Speak** or type the person's name when prompted (speech recognition enabled by default)
+5. Answer any additional questions (speak or type - text fallback always available)
 6. The person is now stored in the database
 
 ### Recognizing People
@@ -237,6 +240,48 @@ Response:
 ```
 
 ## Configuration
+
+### Speech Recognition
+
+Speech recognition is **enabled by default** and supports multiple engines:
+
+```python
+agent = FaceRecognitionAgent(
+    speech_enabled=True,          # Enable/disable speech recognition
+    speech_engine="google",       # Options: google, whisper, sphinx
+    tts_enabled=True              # Enable/disable text-to-speech prompts
+)
+```
+
+**Available Speech Engines:**
+
+1. **Google Speech Recognition** (default)
+   - Online service (requires internet)
+   - Fast and accurate
+   - Free for moderate use
+   - Best for most users
+
+2. **Whisper** (OpenAI)
+   - Offline (after model download)
+   - Excellent accuracy
+   - Supports multiple languages
+   - Requires more resources
+   - First run downloads model (~140MB for base model)
+
+3. **Sphinx** (CMU)
+   - Fully offline
+   - Lower accuracy
+   - Lightweight
+   - Good for privacy-sensitive applications
+
+**Disabling Speech Recognition:**
+
+```python
+# Use text input only
+agent = FaceRecognitionAgent(speech_enabled=False)
+```
+
+**Note:** Even with speech recognition enabled, you can always type instead of speaking. The agent will automatically fall back to text input if speech recognition fails.
 
 ### Face Recognition Models
 
@@ -352,6 +397,47 @@ asyncio.run(food_preference_agent())
 
 ## Troubleshooting
 
+### Speech Recognition Not Working
+
+**PyAudio Installation Issues:**
+
+PyAudio is required for microphone access. Installation varies by platform:
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install portaudio19-dev python3-pyaudio
+pip install pyaudio
+
+# macOS
+brew install portaudio
+pip install pyaudio
+
+# Windows
+pip install pipwin
+pipwin install pyaudio
+```
+
+**Microphone Permissions:**
+
+- **macOS**: Grant Terminal/IDE microphone access in System Preferences → Security & Privacy → Microphone
+- **Linux**: Ensure your user is in the `audio` group: `sudo usermod -a -G audio $USER`
+- **Windows**: Check microphone privacy settings
+
+**Test Microphone:**
+
+```bash
+# Test speech recognition
+python speech_interface.py
+```
+
+**Whisper Model Download:**
+
+First use of Whisper will download models:
+```bash
+# Downloads happen automatically, but you can pre-download:
+python -c "import whisper; whisper.load_model('base')"
+```
+
 ### Camera Not Opening
 
 ```bash
@@ -387,6 +473,7 @@ pip install tensorflow-metal
 2. Switch to a faster model (e.g., OpenFace)
 3. Use opencv detector for faster detection
 4. Lower the camera resolution
+5. For speech: Use Google engine instead of Whisper for faster response
 
 ## API Reference
 

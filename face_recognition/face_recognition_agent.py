@@ -26,6 +26,14 @@ except ImportError:
     DEEPFACE_AVAILABLE = False
     print("Warning: DeepFace not available. Face recognition will not work.")
 
+# Optional speech recognition import
+try:
+    from speech_interface import SpeechInterface, SpeechEngine
+    SPEECH_AVAILABLE = True
+except ImportError:
+    SPEECH_AVAILABLE = False
+    print("Info: Speech recognition not available. Will use text input only.")
+
 
 @dataclass
 class PersonInfo:
@@ -214,7 +222,10 @@ class FaceRecognitionAgent:
         base_url: str = "http://localhost:11434",
         data_dir: str = "people_data",
         face_model: str = "Facenet512",
-        detector_backend: str = "opencv"
+        detector_backend: str = "opencv",
+        speech_enabled: bool = True,
+        speech_engine: str = "google",
+        tts_enabled: bool = True
     ):
         """
         Initialize the Face Recognition Agent.
@@ -226,12 +237,16 @@ class FaceRecognitionAgent:
             data_dir: Directory to store person data
             face_model: DeepFace model to use (Facenet512, VGG-Face, ArcFace, etc.)
             detector_backend: Face detector backend (opencv, ssd, dlib, mtcnn, retinaface)
+            speech_enabled: Enable speech recognition for input
+            speech_engine: Speech engine to use (google, whisper, sphinx)
+            tts_enabled: Enable text-to-speech for prompts
         """
         self.agent_id = agent_id
         self.model_name = model_name
         self.base_url = base_url
         self.face_model = face_model
         self.detector_backend = detector_backend
+        self.speech_enabled = speech_enabled
 
         # Initialize database
         self.db = PersonDatabase(data_dir)
@@ -241,6 +256,27 @@ class FaceRecognitionAgent:
 
         # Camera
         self.camera = None
+
+        # Initialize speech interface
+        self.speech_interface = None
+        if speech_enabled and SPEECH_AVAILABLE:
+            try:
+                engine_map = {
+                    "google": SpeechEngine.GOOGLE,
+                    "whisper": SpeechEngine.WHISPER,
+                    "sphinx": SpeechEngine.SPHINX
+                }
+                engine = engine_map.get(speech_engine.lower(), SpeechEngine.GOOGLE)
+                self.speech_interface = SpeechInterface(
+                    engine=engine,
+                    tts_enabled=tts_enabled
+                )
+                print(f"✓ Speech recognition enabled (engine: {speech_engine})")
+            except Exception as e:
+                print(f"Warning: Could not initialize speech interface: {e}")
+                self.speech_interface = None
+        elif speech_enabled:
+            print("Info: Speech recognition requested but not available.")
 
         # Check if DeepFace is available
         if not DEEPFACE_AVAILABLE:
@@ -408,6 +444,7 @@ class FaceRecognitionAgent:
     async def collect_person_info(self, name: str, frame: np.ndarray) -> Dict[str, Any]:
         """
         Collect information about a person through interactive prompts.
+        Uses speech recognition if enabled, otherwise falls back to text input.
 
         Args:
             name: Person's name
@@ -423,8 +460,19 @@ class FaceRecognitionAgent:
             if question_key == "name":
                 continue  # Already have the name
 
-            print(f"\n{question_key}: ", end='', flush=True)
-            answer = input().strip()
+            # Format question nicely
+            formatted_question = question_key.replace("_", " ").capitalize()
+
+            # Use speech or text input
+            if self.speech_interface:
+                answer = self.speech_interface.ask_question(
+                    f"What is your {formatted_question}?",
+                    allow_text_fallback=True
+                )
+            else:
+                print(f"\n{formatted_question}: ", end='', flush=True)
+                answer = input().strip()
+
             if answer:
                 info[question_key] = answer
 
@@ -495,8 +543,16 @@ class FaceRecognitionAgent:
                         if key == ord('s'):  # Save this person
                             print("\n" + "-" * 80)
                             print("New person detected!")
-                            print("Please provide the person's name: ", end='', flush=True)
-                            name = input().strip()
+
+                            # Get name via speech or text
+                            if self.speech_interface:
+                                name = self.speech_interface.ask_question(
+                                    "What is your name?",
+                                    allow_text_fallback=True
+                                )
+                            else:
+                                print("Please provide the person's name: ", end='', flush=True)
+                                name = input().strip()
 
                             if name:
                                 # Get face encoding
