@@ -363,7 +363,21 @@ class FaceRecognitionAgent:
             # Compare with known faces
             best_match = None
             best_distance = float('inf')
-            threshold = 0.6  # Adjust based on model (lower = stricter)
+
+            # Model-specific thresholds for cosine distance
+            # These are more reliable than Euclidean distance
+            thresholds = {
+                "VGG-Face": 0.40,
+                "Facenet": 0.40,
+                "Facenet512": 0.30,
+                "OpenFace": 0.10,
+                "DeepFace": 0.23,
+                "DeepID": 0.015,
+                "ArcFace": 0.68,
+                "Dlib": 0.07,
+                "SFace": 0.593
+            }
+            threshold = thresholds.get(self.face_model, 0.40)
 
             for name, person in self.db.people.items():
                 if not person.encoding_path or not os.path.exists(person.encoding_path):
@@ -371,12 +385,23 @@ class FaceRecognitionAgent:
 
                 known_embedding = np.load(person.encoding_path)
 
-                # Calculate cosine distance
-                distance = np.linalg.norm(input_embedding - known_embedding)
+                # Use cosine distance (more reliable than Euclidean)
+                # Cosine distance = 1 - cosine similarity
+                dot_product = np.dot(input_embedding, known_embedding)
+                norm_product = np.linalg.norm(input_embedding) * np.linalg.norm(known_embedding)
+                cosine_similarity = dot_product / norm_product
+                distance = 1 - cosine_similarity
+
+                print(f"  Comparing with {name}: distance={distance:.4f}, threshold={threshold}")
 
                 if distance < best_distance and distance < threshold:
                     best_distance = distance
                     best_match = name
+
+            if best_match:
+                print(f"  ✓ Matched: {best_match} (distance: {best_distance:.4f})")
+            else:
+                print(f"  ✗ No match found (best distance: {best_distance:.4f})")
 
             return best_match
 
@@ -395,6 +420,16 @@ class FaceRecognitionAgent:
             Face encoding as numpy array or None if failed
         """
         if not DEEPFACE_AVAILABLE:
+            return None
+
+        # Validate face image
+        if face_img is None or face_img.size == 0:
+            print("Invalid face image")
+            return None
+
+        # Ensure minimum size
+        if face_img.shape[0] < 20 or face_img.shape[1] < 20:
+            print(f"Face image too small: {face_img.shape}")
             return None
 
         try:

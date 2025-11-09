@@ -460,12 +460,44 @@ pip install tensorflow-macos
 pip install tensorflow-metal
 ```
 
+### Face Not Recognized After Saving
+
+If you save a person but they're not recognized:
+
+1. **Check the debug output**: The agent prints distance values when comparing faces
+   - Look for lines like: `Comparing with Name: distance=0.1234, threshold=0.30`
+   - If distance is close to threshold, try adjusting the threshold
+
+2. **Adjust recognition threshold**: Edit `face_recognition_agent.py` line ~372
+   ```python
+   # Make recognition more lenient (increase threshold)
+   "Facenet512": 0.40,  # Default is 0.30, try 0.35-0.45
+   ```
+
+3. **Ensure good conditions when saving AND recognizing**:
+   - Good, consistent lighting
+   - Face clearly visible (not blurry)
+   - Look directly at camera
+   - Avoid extreme angles
+
+4. **Try a different face model**: Some models are more robust
+   ```python
+   agent = FaceRecognitionAgent(face_model="ArcFace")  # More accurate but slower
+   ```
+
+5. **Check saved data**: Verify encodings were saved
+   ```bash
+   ls -la people_data/encodings/
+   ls -la people_data/photos/
+   ```
+
 ### Low Recognition Accuracy
 
 1. Ensure good lighting conditions
 2. Try a different face model (e.g., ArcFace for better accuracy)
 3. Try a different detector (e.g., mtcnn or retinaface)
 4. Ensure the camera is focused on the face
+5. Check that face images are at least 50x50 pixels
 
 ### Performance Issues
 
