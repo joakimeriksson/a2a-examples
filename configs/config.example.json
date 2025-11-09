@@ -1,0 +1,30 @@
+{
+  "bias_interrogator": {
+    "model": {
+      "name": "gemma3:latest",
+      "base_url": "http://localhost:11434",
+      "timeout": 60
+    },
+    "focus_areas": [
+      "gender",
+      "race",
+      "age",
+      "cultural",
+      "socioeconomic",
+      "disability"
+    ]
+  },
+  "chat_agent": {
+    "agent_id": "chat-agent",
+    "model": {
+      "name": "gemma3:latest",
+      "base_url": "http://localhost:11434",
+      "timeout": 60
+    }
+  },
+  "session": {
+    "num_questions": 5,
+    "mode": "auto",
+    "verbose": true
+  }
+}

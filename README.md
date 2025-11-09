@@ -99,6 +99,100 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+## Configuration
+
+### Using Configuration Files
+
+The project supports configuration files for easy customization of models, bias settings, and session parameters. Configuration files can be in YAML, JSON, or TOML format.
+
+#### Quick Start with Config Files
+
+1. Copy an example configuration:
+```bash
+cp configs/config.example.yaml config.yaml
+```
+
+2. Edit `config.yaml` to your preferences
+
+3. Run with the config file:
+```bash
+# Using pixi
+pixi run run -- --config config.yaml
+
+# Or using python directly
+python main.py --config config.yaml
+```
+
+#### Configuration Options
+
+See the [configs/README.md](configs/README.md) for detailed configuration documentation.
+
+Example configuration (YAML):
+```yaml
+bias_interrogator:
+  model:
+    name: gemma3:latest
+    base_url: http://localhost:11434
+    timeout: 60
+  focus_areas:
+    - gender
+    - race
+    - cultural
+
+chat_agent:
+  agent_id: chat-agent
+  model:
+    name: gemma3:latest
+    base_url: http://localhost:11434
+
+session:
+  num_questions: 10
+  mode: auto  # or "interactive"
+  verbose: true
+```
+
+#### Using Different Models
+
+Create config files to test different model combinations:
+
+```yaml
+# configs/multi-model.yaml - Use different models for each agent
+bias_interrogator:
+  model:
+    name: llama3.2:latest  # Larger model for question generation
+chat_agent:
+  model:
+    name: gemma3:latest    # Faster model for responses
+```
+
+Run with:
+```bash
+python main.py --config configs/multi-model.yaml
+```
+
+#### Example Configurations
+
+The `configs/` directory includes several examples:
+- `config.example.yaml` - Basic configuration
+- `config.example.json` - Same config in JSON format
+- `config.example.toml` - Same config in TOML format
+- `multi-model.example.yaml` - Using different models for each agent
+
+#### CLI Arguments Override Config
+
+Command-line arguments take precedence over config file settings:
+
+```bash
+# Use config but override number of questions
+python main.py --config config.yaml -n 20
+
+# Use config but run in interactive mode
+python main.py --config config.yaml --interactive
+
+# Use config but focus on specific bias
+python main.py --config config.yaml -f gender
+```
+
 ## Usage
 
 ### Automated Bias Testing (Default)
@@ -159,16 +253,19 @@ In interactive mode:
 python main.py [options]
 
 Options:
+  -c, --config FILE    Load configuration from file (YAML, JSON, or TOML)
   -i, --interactive    Run in interactive mode
   -n NUM              Number of questions to generate (default: 5)
   -f FOCUS            Focus area for bias testing
   -h, --help          Show help message
 
 Examples:
-  python main.py                    # Run automated test with 5 questions
-  python main.py -n 10              # Run with 10 questions
-  python main.py -f gender          # Focus on gender bias
-  python main.py --interactive      # Run in interactive mode
+  python main.py                           # Run with default settings
+  python main.py --config config.yaml      # Run with config file
+  python main.py -n 10                     # Run with 10 questions
+  python main.py -f gender                 # Focus on gender bias
+  python main.py --interactive             # Run in interactive mode
+  python main.py -c config.yaml -i         # Config file + interactive mode
 ```
 
 ### Running Individual Agents
@@ -210,9 +307,16 @@ a2a-examples/
 │   ├── __init__.py              # Package initialization
 │   ├── bias_interrogator.py    # Bias interrogator agent (pydantic-ai)
 │   └── chat_agent.py            # Chat agent (A2A SDK)
+├── configs/
+│   ├── README.md                # Configuration documentation
+│   ├── config.example.yaml      # Example YAML configuration
+│   ├── config.example.json      # Example JSON configuration
+│   ├── config.example.toml      # Example TOML configuration
+│   └── multi-model.example.yaml # Advanced multi-model example
 ├── examples/
 │   ├── __init__.py              # Examples package
 │   └── quick_test.py            # Quick test script
+├── config.py                    # Configuration module
 ├── main.py                      # Main orchestration script
 ├── pixi.toml                    # Pixi configuration (recommended)
 ├── requirements.txt             # Python dependencies (pip)
@@ -344,6 +448,8 @@ Common tasks:
 - `pixi run interactive` - Interactive mode
 - `pixi run run-gender` - Focus on gender bias
 - `pixi run run-cultural` - Focus on cultural bias
+- `pixi run run-with-config` - Run with example config file
+- `pixi run run-multi-model` - Run with multi-model config
 - `pixi run quick-test` - Quick test both agents
 - `pixi run test-interrogator` - Test bias interrogator only
 - `pixi run test-chat` - Test chat agent only

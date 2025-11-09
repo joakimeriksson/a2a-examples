@@ -9,9 +9,11 @@ This script shows how two agents communicate:
 
 import asyncio
 import sys
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from pathlib import Path
 from agents.bias_interrogator import BiasInterrogator, BiasQuestion
 from agents.chat_agent import ChatAgent
+from config import A2AConfig
 
 
 class A2AOrchestrator:
@@ -21,23 +23,54 @@ class A2AOrchestrator:
 
     def __init__(
         self,
-        model_name: str = "gemma3:latest",
-        base_url: str = "http://localhost:11434",
-        num_questions: int = 5,
+        config: Optional[A2AConfig] = None,
+        model_name: Optional[str] = None,
+        base_url: Optional[str] = None,
+        num_questions: Optional[int] = None,
     ):
         """
         Initialize the orchestrator.
 
         Args:
-            model_name: Name of the Ollama model to use
-            base_url: Base URL for the Ollama API
-            num_questions: Number of bias-probing questions to generate
+            config: A2AConfig object (preferred). If provided, overrides other args.
+            model_name: Name of the Ollama model to use (legacy, for backward compatibility)
+            base_url: Base URL for the Ollama API (legacy)
+            num_questions: Number of bias-probing questions to generate (legacy)
         """
-        self.interrogator = BiasInterrogator(model_name=model_name, base_url=base_url)
-        self.chat_agent = ChatAgent(
-            agent_id="chat-agent-1", model_name=model_name, base_url=base_url
+        # Use config if provided, otherwise use legacy parameters or defaults
+        if config is None:
+            config = A2AConfig.get_default()
+            # Override with legacy parameters if provided
+            if model_name:
+                config.bias_interrogator.model.name = model_name
+                config.chat_agent.model.name = model_name
+            if base_url:
+                config.bias_interrogator.model.base_url = base_url
+                config.chat_agent.model.base_url = base_url
+            if num_questions is not None:
+                config.session.num_questions = num_questions
+
+        self.config = config
+
+        # Initialize agents from config
+        self.interrogator = BiasInterrogator(
+            model_name=config.bias_interrogator.model.name,
+            base_url=config.bias_interrogator.model.base_url,
         )
-        self.num_questions = num_questions
+        self.chat_agent = ChatAgent(
+            agent_id=config.chat_agent.agent_id,
+            model_name=config.chat_agent.model.name,
+            base_url=config.chat_agent.model.base_url,
+        )
+
+        # Override system prompts if provided in config
+        if config.bias_interrogator.system_prompt:
+            self.interrogator.agent.system_prompt = config.bias_interrogator.system_prompt
+        if config.chat_agent.system_prompt:
+            self.chat_agent.system_prompt = config.chat_agent.system_prompt
+
+        self.num_questions = config.session.num_questions
+        self.verbose = config.session.verbose
         self.results: List[Dict[str, Any]] = []
 
     async def run_bias_test(self, focus_area: str = None) -> List[Dict[str, Any]]:
@@ -168,49 +201,102 @@ async def main():
     print("\nBoth agents are backed by local Ollama models (gemma3:latest)")
     print("=" * 100)
 
-    # Check command line arguments
-    mode = "auto"
-    num_questions = 5
+    # Parse command line arguments
+    config_file = None
+    mode = None
+    num_questions = None
     focus_area = None
 
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "--interactive" or sys.argv[1] == "-i":
-            mode = "interactive"
-        elif sys.argv[1] == "--help" or sys.argv[1] == "-h":
-            print("\nUsage:")
-            print("  python main.py [options]")
-            print("\nOptions:")
-            print("  -i, --interactive    Run in interactive mode")
-            print("  -n NUM              Number of questions to generate (default: 5)")
-            print("  -f FOCUS            Focus area for bias testing")
-            print("  -h, --help          Show this help message")
-            print("\nExamples:")
-            print("  python main.py                    # Run automated test with 5 questions")
-            print("  python main.py -n 10              # Run with 10 questions")
-            print("  python main.py -f gender          # Focus on gender bias")
-            print("  python main.py --interactive      # Run in interactive mode")
-            return
+    # Help message
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print("\nUsage:")
+        print("  python main.py [options]")
+        print("\nOptions:")
+        print("  -c, --config FILE    Load configuration from file (YAML, JSON, or TOML)")
+        print("  -i, --interactive    Run in interactive mode")
+        print("  -n NUM              Number of questions to generate (default: 5)")
+        print("  -f FOCUS            Focus area for bias testing")
+        print("  -h, --help          Show this help message")
+        print("\nExamples:")
+        print("  python main.py                           # Run with default config")
+        print("  python main.py --config config.yaml      # Run with config file")
+        print("  python main.py -n 10                     # Run with 10 questions")
+        print("  python main.py -f gender                 # Focus on gender bias")
+        print("  python main.py --interactive             # Run in interactive mode")
+        print("  python main.py -c config.yaml -i         # Config file + interactive")
+        return
 
-    # Parse other arguments
+    # Parse arguments
     i = 1
     while i < len(sys.argv):
-        if sys.argv[i] in ["-n", "--num"]:
+        if sys.argv[i] in ["-c", "--config"]:
+            if i + 1 < len(sys.argv):
+                config_file = sys.argv[i + 1]
+                i += 2
+            else:
+                print("Error: --config requires a file path")
+                return
+        elif sys.argv[i] in ["-i", "--interactive"]:
+            mode = "interactive"
+            i += 1
+        elif sys.argv[i] in ["-n", "--num"]:
             if i + 1 < len(sys.argv):
                 num_questions = int(sys.argv[i + 1])
                 i += 2
             else:
-                i += 1
+                print("Error: --num requires a number")
+                return
         elif sys.argv[i] in ["-f", "--focus"]:
             if i + 1 < len(sys.argv):
                 focus_area = sys.argv[i + 1]
                 i += 2
             else:
-                i += 1
+                print("Error: --focus requires an area")
+                return
         else:
             i += 1
 
+    # Load configuration
+    config = None
+    if config_file:
+        try:
+            config = A2AConfig.from_file(config_file)
+            print(f"\nLoaded configuration from: {config_file}")
+            print(f"  - Bias Interrogator Model: {config.bias_interrogator.model.name}")
+            print(f"  - Chat Agent Model: {config.chat_agent.model.name}")
+            print(f"  - Session Questions: {config.session.num_questions}")
+        except FileNotFoundError:
+            print(f"Error: Configuration file not found: {config_file}")
+            return
+        except Exception as e:
+            print(f"Error loading configuration: {e}")
+            return
+
+        # Command line arguments override config file
+        if mode:
+            config.session.mode = mode
+        if num_questions is not None:
+            config.session.num_questions = num_questions
+        if focus_area:
+            config.session.focus_area = focus_area
+
+        # Use mode and focus from config if not overridden
+        if mode is None:
+            mode = config.session.mode
+        if focus_area is None:
+            focus_area = config.session.focus_area
+    else:
+        # No config file, use defaults or CLI args
+        if mode is None:
+            mode = "auto"
+        if num_questions is None:
+            num_questions = 5
+
     # Create orchestrator
-    orchestrator = A2AOrchestrator(num_questions=num_questions)
+    if config:
+        orchestrator = A2AOrchestrator(config=config)
+    else:
+        orchestrator = A2AOrchestrator(num_questions=num_questions)
 
     try:
         if mode == "interactive":

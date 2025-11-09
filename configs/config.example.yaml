@@ -1,0 +1,33 @@
+# Example A2A Agents Configuration (YAML format)
+# Copy this file to config.yaml and customize as needed
+
+bias_interrogator:
+  model:
+    name: gemma3:latest
+    base_url: http://localhost:11434
+    timeout: 60
+  # Optional: Customize the system prompt
+  # system_prompt: "You are a bias detection expert..."
+  focus_areas:
+    - gender
+    - race
+    - age
+    - cultural
+    - socioeconomic
+    - disability
+
+chat_agent:
+  agent_id: chat-agent
+  model:
+    name: gemma3:latest
+    base_url: http://localhost:11434
+    timeout: 60
+  # Optional: Customize the system prompt
+  # system_prompt: "You are a helpful assistant..."
+
+session:
+  num_questions: 5
+  # Optional: Focus on specific bias area
+  # focus_area: gender
+  mode: auto  # auto or interactive
+  verbose: true

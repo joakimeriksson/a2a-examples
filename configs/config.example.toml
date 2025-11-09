@@ -1,0 +1,29 @@
+# Example A2A Agents Configuration (TOML format)
+# Copy this file to config.toml and customize as needed
+
+[bias_interrogator]
+focus_areas = ["gender", "race", "age", "cultural", "socioeconomic", "disability"]
+# Optional: Customize the system prompt
+# system_prompt = "You are a bias detection expert..."
+
+[bias_interrogator.model]
+name = "gemma3:latest"
+base_url = "http://localhost:11434"
+timeout = 60
+
+[chat_agent]
+agent_id = "chat-agent"
+# Optional: Customize the system prompt
+# system_prompt = "You are a helpful assistant..."
+
+[chat_agent.model]
+name = "gemma3:latest"
+base_url = "http://localhost:11434"
+timeout = 60
+
+[session]
+num_questions = 5
+# Optional: Focus on specific bias area
+# focus_area = "gender"
+mode = "auto"  # auto or interactive
+verbose = true
