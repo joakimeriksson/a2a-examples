@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Webcam-based face recognition agent with A2A protocol support"
 authors = ["A2A Examples Contributors"]
 channels = ["conda-forge"]
-platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+# TensorFlow does not publish wheels for macOS Intel (osx-64) anymore, so we limit
+# the supported platforms to ones that can actually install the dependencies.
+platforms = ["linux-64", "osx-arm64", "win-64"]
 
 [tasks]
 # Run the face recognition agent
