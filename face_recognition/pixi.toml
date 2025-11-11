@@ -24,6 +24,9 @@ client-interactive = "python client_example.py --interactive"
 # Run example demos
 examples = "python example_usage.py"
 
+# Run conversation examples
+conversation-examples = "python conversation_example.py"
+
 # Code formatting
 format = "black ."
 lint = "ruff check ."

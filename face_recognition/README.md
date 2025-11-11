@@ -136,6 +136,35 @@ This provides several demos:
 - Unknown faces are shown with a red box and "Unknown" label
 - Press 'q' to quit the recognition loop
 
+### Having Conversations
+
+When a person is recognized, the agent can automatically start a conversation:
+
+1. **Configure conversation questions**:
+   ```python
+   agent = FaceRecognitionAgent(
+       conversation_enabled=True,
+       conversation_questions=["favorite_candy", "interests", "hobby"]
+   )
+   ```
+
+2. **The agent will**:
+   - Greet the person by name: "Hello John! Nice to see you again!"
+   - Ask configured questions they haven't answered yet
+   - Update their profile with new information
+   - Wait 5 minutes (configurable) before asking again
+
+3. **Example**:
+   ```
+   ============================================================
+   Hello John! Nice to see you again!
+   🔊 (Speaking: "Tell me, what is your favorite candy?")
+   🎤 Listening... (speak now)
+   ✓ Heard: Chocolate
+   Thanks for chatting!
+   ============================================================
+   ```
+
 ### A2A Protocol Operations
 
 Other agents can interact with the Face Recognition Agent using these operations:
@@ -239,6 +268,62 @@ Response:
 }
 ```
 
+#### 5. Set Conversation Questions
+
+Configure which questions to ask recognized people:
+
+```python
+request = {
+    "operation": "set_conversation_questions",
+    "questions": ["favorite_candy", "interests", "hobby"],
+    "replace": False  # True to replace all, False to add
+}
+response = await agent.handle_a2a_request(request)
+```
+
+Response:
+```json
+{
+    "status": "success",
+    "message": "Conversation questions updated to include 3 questions",
+    "conversation_questions": ["favorite_candy", "interests", "hobby"]
+}
+```
+
+#### 6. Get Conversation Configuration
+
+Get current conversation settings:
+
+```python
+request = {
+    "operation": "get_conversation_config"
+}
+response = await agent.handle_a2a_request(request)
+```
+
+Response:
+```json
+{
+    "status": "success",
+    "conversation_enabled": true,
+    "conversation_questions": ["favorite_candy", "interests"],
+    "conversation_cooldown": 300
+}
+```
+
+#### 7. Set Conversation Configuration
+
+Change conversation settings:
+
+```python
+request = {
+    "operation": "set_conversation_config",
+    "enabled": true,
+    "cooldown": 60  # seconds between conversations
+}
+response = await agent.handle_a2a_request(request)
+```
+
 ## Configuration
 
 ### Speech Recognition
@@ -282,6 +367,49 @@ agent = FaceRecognitionAgent(speech_enabled=False)
 ```
 
 **Note:** Even with speech recognition enabled, you can always type instead of speaking. The agent will automatically fall back to text input if speech recognition fails.
+
+### Conversation Configuration
+
+Configure automatic conversations with recognized people:
+
+```python
+agent = FaceRecognitionAgent(
+    conversation_enabled=True,                    # Enable conversations
+    conversation_questions=["favorite_candy", "interests"],  # Questions to ask
+)
+```
+
+**Configuration Options:**
+
+- `conversation_enabled`: Enable/disable conversations (default: `True`)
+- `conversation_questions`: List of questions to ask (default: `[]`)
+- `conversation_cooldown`: Seconds between conversations with same person (default: `300`)
+
+**Example Questions:**
+- `"favorite_candy"` - What candy do you like?
+- `"interests"` - What are your interests?
+- `"hobby"` - What hobbies do you have?
+- `"favorite_music"` - What music do you like?
+- `"sport"` - Do you play any sports?
+
+**Dynamic Configuration via A2A:**
+
+Other agents can configure conversations at runtime:
+
+```python
+# Add questions
+await agent.handle_a2a_request({
+    "operation": "set_conversation_questions",
+    "questions": ["favorite_candy"],
+    "replace": False  # Add to existing
+})
+
+# Change cooldown
+await agent.handle_a2a_request({
+    "operation": "set_conversation_config",
+    "cooldown": 60  # 1 minute
+})
+```
 
 ### Face Recognition Models
 

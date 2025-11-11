@@ -225,7 +225,9 @@ class FaceRecognitionAgent:
         detector_backend: str = "opencv",
         speech_enabled: bool = True,
         speech_engine: str = "google",
-        tts_enabled: bool = True
+        tts_enabled: bool = True,
+        conversation_enabled: bool = True,
+        conversation_questions: Optional[List[str]] = None
     ):
         """
         Initialize the Face Recognition Agent.
@@ -240,6 +242,8 @@ class FaceRecognitionAgent:
             speech_enabled: Enable speech recognition for input
             speech_engine: Speech engine to use (google, whisper, sphinx)
             tts_enabled: Enable text-to-speech for prompts
+            conversation_enabled: Enable conversation with recognized people
+            conversation_questions: Questions to ask recognized people (e.g., ["favorite_candy", "interests"])
         """
         self.agent_id = agent_id
         self.model_name = model_name
@@ -247,12 +251,23 @@ class FaceRecognitionAgent:
         self.face_model = face_model
         self.detector_backend = detector_backend
         self.speech_enabled = speech_enabled
+        self.conversation_enabled = conversation_enabled
 
         # Initialize database
         self.db = PersonDatabase(data_dir)
 
-        # Pending questions from other agents
+        # Questions for new people (when saving)
         self.pending_questions: Set[str] = {"name"}  # Always ask for name
+
+        # Questions for recognized people (during conversation)
+        if conversation_questions is None:
+            self.conversation_questions: List[str] = []
+        else:
+            self.conversation_questions = conversation_questions
+
+        # Track last conversation time to avoid repeating too often
+        self.last_conversation: Dict[str, float] = {}
+        self.conversation_cooldown: int = 300  # 5 minutes between conversations
 
         # Camera
         self.camera = None
@@ -513,6 +528,75 @@ class FaceRecognitionAgent:
 
         return info
 
+    async def have_conversation(self, name: str) -> Dict[str, Any]:
+        """
+        Have a conversation with a recognized person.
+
+        Args:
+            name: Person's name
+
+        Returns:
+            Dictionary of new information collected
+        """
+        import time
+
+        # Check cooldown
+        current_time = time.time()
+        if name in self.last_conversation:
+            time_since_last = current_time - self.last_conversation[name]
+            if time_since_last < self.conversation_cooldown:
+                print(f"(Cooldown: talked with {name} {int(time_since_last)}s ago)")
+                return {}
+
+        # Greet the person
+        greeting = f"Hello {name}! Nice to see you again!"
+        print(f"\n{'=' * 60}")
+        print(greeting)
+        if self.speech_interface:
+            self.speech_interface.speak(greeting)
+
+        new_info = {}
+
+        # Ask conversation questions
+        for question_key in self.conversation_questions:
+            # Check if we already have this info
+            person = self.db.get_person(name)
+            if person and question_key in person.metadata:
+                continue  # Skip if we already know
+
+            # Format question nicely
+            formatted_question = question_key.replace("_", " ").capitalize()
+
+            # Ask the question
+            if self.speech_interface:
+                answer = self.speech_interface.ask_question(
+                    f"Tell me, what is your {formatted_question}?",
+                    allow_text_fallback=True
+                )
+            else:
+                print(f"{formatted_question}: ", end='', flush=True)
+                answer = input().strip()
+
+            if answer:
+                new_info[question_key] = answer
+
+        # Update database if we got new info
+        if new_info:
+            self.db.update_person(name, new_info)
+            print(f"✓ Updated information for {name}")
+
+        # Update last conversation time
+        self.last_conversation[name] = current_time
+
+        # Say goodbye
+        goodbye = "Thanks for chatting!"
+        if self.speech_interface:
+            self.speech_interface.speak(goodbye)
+        print(goodbye)
+        print("=" * 60 + "\n")
+
+        return new_info
+
     async def process_recognition_loop(self, duration: int = 30):
         """
         Run the face recognition loop for a specified duration.
@@ -569,6 +653,11 @@ class FaceRecognitionAgent:
                         display_frame, label, (x, y-10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2
                     )
+
+                    # Have conversation with recognized person
+                    if recognized_name and self.conversation_enabled and self.conversation_questions:
+                        # Trigger conversation (will check cooldown internally)
+                        await self.have_conversation(recognized_name)
 
                     # If unknown face detected, offer to add
                     if not recognized_name and len(faces) == 1:  # Only one face
@@ -704,6 +793,57 @@ class FaceRecognitionAgent:
                 }
             }
 
+        elif operation == "set_conversation_questions":
+            questions = request_data.get("questions", [])
+            replace = request_data.get("replace", False)
+
+            if replace:
+                self.conversation_questions = questions
+            else:
+                # Add to existing questions
+                for q in questions:
+                    if q not in self.conversation_questions:
+                        self.conversation_questions.append(q)
+
+            return {
+                "status": "success",
+                "message": f"Conversation questions {'replaced with' if replace else 'updated to include'} {len(questions)} questions",
+                "conversation_questions": self.conversation_questions,
+                "agent_info": {
+                    "id": self.agent_id,
+                    "type": "face_recognition_agent"
+                }
+            }
+
+        elif operation == "get_conversation_config":
+            return {
+                "status": "success",
+                "conversation_enabled": self.conversation_enabled,
+                "conversation_questions": self.conversation_questions,
+                "conversation_cooldown": self.conversation_cooldown,
+                "agent_info": {
+                    "id": self.agent_id,
+                    "type": "face_recognition_agent"
+                }
+            }
+
+        elif operation == "set_conversation_config":
+            if "enabled" in request_data:
+                self.conversation_enabled = request_data["enabled"]
+            if "cooldown" in request_data:
+                self.conversation_cooldown = request_data["cooldown"]
+
+            return {
+                "status": "success",
+                "message": "Configuration updated",
+                "conversation_enabled": self.conversation_enabled,
+                "conversation_cooldown": self.conversation_cooldown,
+                "agent_info": {
+                    "id": self.agent_id,
+                    "type": "face_recognition_agent"
+                }
+            }
+
         elif operation == "search_people":
             query = request_data.get("query", {})
             results = self.db.search_by_metadata(query)
@@ -732,7 +872,10 @@ class FaceRecognitionAgent:
                     "query_person",
                     "list_people",
                     "request_questions",
-                    "search_people"
+                    "search_people",
+                    "set_conversation_questions",
+                    "get_conversation_config",
+                    "set_conversation_config"
                 ],
                 "agent_info": {
                     "id": self.agent_id,
