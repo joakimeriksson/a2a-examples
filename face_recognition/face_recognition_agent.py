@@ -35,6 +35,31 @@ except ImportError:
     print("Info: Speech recognition not available. Will use text input only.")
 
 
+def format_question(question_key: str) -> str:
+    """Format a question key into a natural question string."""
+    # Map of question keys to natural questions
+    question_map = {
+        "name": "What is your name?",
+        "interests": "What are your interests?",
+        "hobby": "What are your hobbies?",
+        "hobbies": "What are your hobbies?",
+        "favorite_candy": "What is your favorite candy?",
+        "favorite_food": "What is your favorite food?",
+        "favorite_color": "What is your favorite color?",
+        "favorite_music": "What kind of music do you like?",
+        "favorite_movie": "What is your favorite movie?",
+        "occupation": "What do you do for work?",
+        "age": "How old are you?",
+    }
+
+    if question_key in question_map:
+        return question_map[question_key]
+
+    # Default formatting for unknown keys
+    formatted = question_key.replace("_", " ")
+    return f"What is your {formatted}?"
+
+
 @dataclass
 class PersonInfo:
     """Information about a recognized person."""
@@ -153,6 +178,59 @@ class PersonDatabase:
         self._save_database()
 
         return person_info
+
+    def add_embedding(self, name: str, encoding: np.ndarray) -> bool:
+        """
+        Add an additional face embedding for a person.
+
+        This improves recognition by having multiple samples from different angles.
+
+        Args:
+            name: Person's name
+            encoding: Face encoding as numpy array
+
+        Returns:
+            True if embedding was added, False if person not found
+        """
+        if name not in self.people:
+            return False
+
+        timestamp = datetime.utcnow().isoformat()
+        encoding_filename = f"{name.replace(' ', '_')}_{timestamp.replace(':', '-')}.npy"
+        encoding_path = self.encodings_dir / encoding_filename
+        np.save(str(encoding_path), encoding)
+        return True
+
+    def get_all_embeddings(self, name: str) -> List[np.ndarray]:
+        """
+        Get all face embeddings for a person.
+
+        Args:
+            name: Person's name
+
+        Returns:
+            List of face embeddings
+        """
+        if name not in self.people:
+            return []
+
+        embeddings = []
+        name_prefix = name.replace(' ', '_') + '_'
+
+        # Get the primary embedding
+        person = self.people[name]
+        if person.encoding_path and os.path.exists(person.encoding_path):
+            embeddings.append(np.load(person.encoding_path))
+
+        # Find additional embeddings
+        for encoding_file in self.encodings_dir.glob(f"{name_prefix}*.npy"):
+            if str(encoding_file) != person.encoding_path:
+                try:
+                    embeddings.append(np.load(str(encoding_file)))
+                except Exception:
+                    pass
+
+        return embeddings
 
     def update_person(self, name: str, metadata: Dict[str, Any]):
         """
@@ -380,37 +458,43 @@ class FaceRecognitionAgent:
             best_distance = float('inf')
 
             # Model-specific thresholds for cosine distance
-            # These are more reliable than Euclidean distance
+            # Using more lenient thresholds for better real-world recognition
             thresholds = {
-                "VGG-Face": 0.40,
-                "Facenet": 0.40,
-                "Facenet512": 0.30,
-                "OpenFace": 0.10,
-                "DeepFace": 0.23,
-                "DeepID": 0.015,
-                "ArcFace": 0.68,
-                "Dlib": 0.07,
-                "SFace": 0.593
+                "VGG-Face": 0.50,
+                "Facenet": 0.50,
+                "Facenet512": 0.45,  # More lenient for webcam variations
+                "OpenFace": 0.15,
+                "DeepFace": 0.30,
+                "DeepID": 0.02,
+                "ArcFace": 0.70,
+                "Dlib": 0.10,
+                "SFace": 0.65
             }
-            threshold = thresholds.get(self.face_model, 0.40)
+            threshold = thresholds.get(self.face_model, 0.50)
 
             for name, person in self.db.people.items():
-                if not person.encoding_path or not os.path.exists(person.encoding_path):
+                # Get all embeddings for this person (supports multiple samples)
+                embeddings = self.db.get_all_embeddings(name)
+                if not embeddings:
                     continue
 
-                known_embedding = np.load(person.encoding_path)
+                # Find best match among all embeddings for this person
+                person_best_distance = float('inf')
+                for known_embedding in embeddings:
+                    # Use cosine distance (more reliable than Euclidean)
+                    # Cosine distance = 1 - cosine similarity
+                    dot_product = np.dot(input_embedding, known_embedding)
+                    norm_product = np.linalg.norm(input_embedding) * np.linalg.norm(known_embedding)
+                    cosine_similarity = dot_product / norm_product
+                    distance = 1 - cosine_similarity
 
-                # Use cosine distance (more reliable than Euclidean)
-                # Cosine distance = 1 - cosine similarity
-                dot_product = np.dot(input_embedding, known_embedding)
-                norm_product = np.linalg.norm(input_embedding) * np.linalg.norm(known_embedding)
-                cosine_similarity = dot_product / norm_product
-                distance = 1 - cosine_similarity
+                    if distance < person_best_distance:
+                        person_best_distance = distance
 
-                print(f"  Comparing with {name}: distance={distance:.4f}, threshold={threshold}")
+                print(f"  Comparing with {name}: distance={person_best_distance:.4f}, threshold={threshold} ({len(embeddings)} samples)")
 
-                if distance < best_distance and distance < threshold:
-                    best_distance = distance
+                if person_best_distance < best_distance and person_best_distance < threshold:
+                    best_distance = person_best_distance
                     best_match = name
 
             if best_match:
@@ -516,17 +600,15 @@ class FaceRecognitionAgent:
             if question_key == "name":
                 continue  # Already have the name
 
-            # Format question nicely
-            formatted_question = question_key.replace("_", " ").capitalize()
-
             # Use speech or text input
+            question_text = format_question(question_key)
             if self.speech_interface:
                 answer = self.speech_interface.ask_question(
-                    f"What is your {formatted_question}?",
+                    question_text,
                     allow_text_fallback=True
                 )
             else:
-                print(f"\n{formatted_question}: ", end='', flush=True)
+                print(f"\n{question_text} ", end='', flush=True)
                 answer = input().strip()
 
             if answer:
@@ -576,17 +658,15 @@ class FaceRecognitionAgent:
             if person and question_key in person.metadata:
                 continue  # Skip if we already know
 
-            # Format question nicely
-            formatted_question = question_key.replace("_", " ").capitalize()
-
             # Ask the question
+            question_text = format_question(question_key)
             if self.speech_interface:
                 answer = self.speech_interface.ask_question(
-                    f"Tell me, what is your {formatted_question}?",
+                    question_text,
                     allow_text_fallback=True
                 )
             else:
-                print(f"{formatted_question}: ", end='', flush=True)
+                print(f"{question_text} ", end='', flush=True)
                 answer = input().strip()
 
             if answer:
@@ -619,8 +699,12 @@ class FaceRecognitionAgent:
         print("\n" + "=" * 80)
         print("FACE RECOGNITION AGENT - STARTING")
         print("=" * 80)
-        print("\nPress 'q' to quit, 's' to save current frame")
+        print("\nPress 'q' to quit, 's' to save new person, 'a' to add sample for recognized person")
         print("The agent will recognize faces and collect information.\n")
+
+        # Track last recognized person for adding samples
+        last_recognized = None
+        last_face_img = None
 
         self._init_camera()
         start_time = datetime.now()
@@ -655,6 +739,11 @@ class FaceRecognitionAgent:
 
                     # Try to recognize
                     recognized_name = self.recognize_face(face_img)
+
+                    # Track for adding samples
+                    if recognized_name:
+                        last_recognized = recognized_name
+                        last_face_img = face_img.copy()
 
                     # Draw rectangle and label
                     color = (0, 255, 0) if recognized_name else (0, 0, 255)
@@ -720,10 +809,22 @@ class FaceRecognitionAgent:
                 # Display frame
                 cv2.imshow('Face Recognition', display_frame)
 
-                # Check for quit
+                # Check for key presses
                 key = cv2.waitKey(1) & 0xFF
                 if key == ord('q'):
                     break
+                elif key == ord('a') and last_recognized and last_face_img is not None:
+                    # Add another sample for better recognition
+                    encoding = self.get_face_encoding(last_face_img)
+                    if encoding is not None:
+                        if self.db.add_embedding(last_recognized, encoding):
+                            print(f"\n✓ Added new face sample for {last_recognized}")
+                            num_samples = len(self.db.get_all_embeddings(last_recognized))
+                            print(f"  Total samples: {num_samples}")
+                        else:
+                            print(f"\n✗ Failed to add sample for {last_recognized}")
+                    else:
+                        print("\n✗ Could not extract face encoding")
 
                 await asyncio.sleep(0.1)
 
