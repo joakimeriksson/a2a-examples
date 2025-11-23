@@ -446,6 +446,18 @@ class FaceRecognitionAgent:
             print(f"Error detecting faces: {e}")
             return []
 
+    @staticmethod
+    def _cosine_distance(vec1: np.ndarray, vec2: np.ndarray) -> float:
+        """
+        Compute cosine distance between two embeddings.
+        Returns a large number if either vector has zero norm.
+        """
+        norm_product = np.linalg.norm(vec1) * np.linalg.norm(vec2)
+        if norm_product == 0:
+            return float("inf")
+        cosine_similarity = np.dot(vec1, vec2) / norm_product
+        return 1 - cosine_similarity
+
     def recognize_face_embedding(self, input_embedding: np.ndarray) -> Optional[str]:
         """
         Recognize a face against known people using pre-computed embedding.
@@ -476,16 +488,12 @@ class FaceRecognitionAgent:
                 # Find best match among all embeddings for this person
                 person_best_distance = float('inf')
                 for known_embedding in embeddings:
-                    # Use cosine distance
-                    dot_product = np.dot(input_embedding, known_embedding)
-                    norm_product = np.linalg.norm(input_embedding) * np.linalg.norm(known_embedding)
-                    cosine_similarity = dot_product / norm_product
-                    distance = 1 - cosine_similarity
-
+                    # Calculate cosine distance between embeddings for reliable matching
+                    distance = self._cosine_distance(input_embedding, known_embedding)
                     if distance < person_best_distance:
                         person_best_distance = distance
 
-                print(f"  Comparing with {name}: distance={person_best_distance:.4f}, threshold={threshold} ({len(embeddings)} samples)")
+                print(f"  Comparing with {name}: distance={person_best_distance:.4f}, threshold={threshold}")
 
                 if person_best_distance < best_distance and person_best_distance < threshold:
                     best_distance = person_best_distance
