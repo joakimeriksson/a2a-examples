@@ -79,7 +79,9 @@ class SpeechInterface:
         # Initialize recognizer
         if SPEECH_RECOGNITION_AVAILABLE:
             self.recognizer = sr.Recognizer()
-            self.microphone = sr.Microphone()
+            # Use 16kHz for Whisper (native rate), higher for others
+            sample_rate = 16000 if engine == SpeechEngine.WHISPER else None
+            self.microphone = sr.Microphone(sample_rate=sample_rate)
         else:
             self.recognizer = None
             self.microphone = None
