@@ -221,7 +221,7 @@ class SpeechInterface:
             print(f"Sphinx recognition error: {e}")
             return None
 
-    def ask_question(self, question: str, allow_text_fallback: bool = True, confirm: bool = True) -> str:
+    def ask_question(self, question: str, allow_text_fallback: bool = True, confirm: bool = False) -> str:
         """
         Ask a question and get an answer via speech or text.
 
@@ -241,14 +241,12 @@ class SpeechInterface:
             print("(You can also type your answer)")
             print(f"{question} ", end='', flush=True)
             answer = input().strip()
-
-        # Confirm/correct the answer
-        if answer and confirm:
+        elif answer and confirm:
+            # Optional: confirm and allow correction
             print(f"Heard: \"{answer}\"")
             correction = input("Press Enter if correct, or type correction: ").strip()
             if correction:
                 answer = correction
-                print(f"Using: \"{answer}\"")
 
         return answer if answer else ""
 
