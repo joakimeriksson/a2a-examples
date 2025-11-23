@@ -1,5 +1,5 @@
 """
-Face Recognition Agent using webcam and DeepFace.
+Face Recognition Agent using webcam and InsightFace.
 
 This agent can recognize people using a webcam, store their information,
 and respond to queries from other agents over A2A protocol.
@@ -18,13 +18,14 @@ import numpy as np
 from PIL import Image
 import httpx
 
-# Optional DeepFace import - will be checked at runtime
+# Optional InsightFace import - will be checked at runtime
 try:
-    from deepface import DeepFace
-    DEEPFACE_AVAILABLE = True
+    import insightface
+    from insightface.app import FaceAnalysis
+    INSIGHTFACE_AVAILABLE = True
 except ImportError:
-    DEEPFACE_AVAILABLE = False
-    print("Warning: DeepFace not available. Face recognition will not work.")
+    INSIGHTFACE_AVAILABLE = False
+    print("Warning: InsightFace not available. Face recognition will not work.")
 
 # Optional speech recognition import
 try:
@@ -299,8 +300,7 @@ class FaceRecognitionAgent:
         model_name: str = "gemma3:latest",
         base_url: str = "http://localhost:11434",
         data_dir: str = "people_data",
-        face_model: str = "Facenet512",
-        detector_backend: str = "opencv",
+        det_size: tuple = (640, 640),
         speech_enabled: bool = True,
         speech_engine: str = "google",
         tts_enabled: bool = True,
@@ -315,8 +315,7 @@ class FaceRecognitionAgent:
             model_name: Name of the Ollama model for natural language tasks
             base_url: Base URL for the Ollama API
             data_dir: Directory to store person data
-            face_model: DeepFace model to use (Facenet512, VGG-Face, ArcFace, etc.)
-            detector_backend: Face detector backend (opencv, ssd, dlib, mtcnn, retinaface)
+            det_size: Detection size for InsightFace (default: 640x640)
             speech_enabled: Enable speech recognition for input
             speech_engine: Speech engine to use (google, whisper, sphinx)
             tts_enabled: Enable text-to-speech for prompts
@@ -326,8 +325,6 @@ class FaceRecognitionAgent:
         self.agent_id = agent_id
         self.model_name = model_name
         self.base_url = base_url
-        self.face_model = face_model
-        self.detector_backend = detector_backend
         self.speech_enabled = speech_enabled
         self.conversation_enabled = conversation_enabled
 
@@ -350,6 +347,22 @@ class FaceRecognitionAgent:
         # Camera
         self.camera = None
 
+        # Initialize InsightFace
+        self.face_app = None
+        if INSIGHTFACE_AVAILABLE:
+            try:
+                self.face_app = FaceAnalysis(
+                    name='buffalo_l',  # Best accuracy model
+                    providers=['CPUExecutionProvider']
+                )
+                self.face_app.prepare(ctx_id=0, det_size=det_size)
+                print(f"✓ InsightFace initialized (model: buffalo_l, det_size: {det_size})")
+            except Exception as e:
+                print(f"Warning: Could not initialize InsightFace: {e}")
+                self.face_app = None
+        else:
+            print("WARNING: InsightFace not available. Please install with: pip install insightface onnxruntime")
+
         # Initialize speech interface
         self.speech_interface = None
         if speech_enabled and SPEECH_AVAILABLE:
@@ -370,10 +383,6 @@ class FaceRecognitionAgent:
                 self.speech_interface = None
         elif speech_enabled:
             print("Info: Speech recognition requested but not available.")
-
-        # Check if DeepFace is available
-        if not DEEPFACE_AVAILABLE:
-            print("WARNING: DeepFace not available. Please install with: pip install deepface")
 
     def _init_camera(self):
         """Initialize the webcam."""
@@ -403,74 +412,60 @@ class FaceRecognitionAgent:
 
     def detect_faces(self, frame: np.ndarray) -> List[Dict[str, Any]]:
         """
-        Detect faces in a frame.
+        Detect faces in a frame using InsightFace.
 
         Args:
             frame: Frame as numpy array (BGR format)
 
         Returns:
-            List of face detection results
+            List of face detection results with embeddings
         """
-        if not DEEPFACE_AVAILABLE:
+        if self.face_app is None:
             return []
 
         try:
-            # DeepFace.extract_faces returns list of face objects
-            faces = DeepFace.extract_faces(
-                img_path=frame,
-                detector_backend=self.detector_backend,
-                enforce_detection=False
-            )
-            return faces
+            # InsightFace returns face objects with bbox and embedding
+            faces = self.face_app.get(frame)
+
+            # Convert to consistent format
+            results = []
+            for face in faces:
+                bbox = face.bbox.astype(int)
+                results.append({
+                    "facial_area": {
+                        "x": int(bbox[0]),
+                        "y": int(bbox[1]),
+                        "w": int(bbox[2] - bbox[0]),
+                        "h": int(bbox[3] - bbox[1])
+                    },
+                    "embedding": face.embedding,
+                    "det_score": float(face.det_score)
+                })
+            return results
         except Exception as e:
             print(f"Error detecting faces: {e}")
             return []
 
-    def recognize_face(self, face_img: np.ndarray) -> Optional[str]:
+    def recognize_face_embedding(self, input_embedding: np.ndarray) -> Optional[str]:
         """
-        Recognize a face against known people in the database.
+        Recognize a face against known people using pre-computed embedding.
 
         Args:
-            face_img: Face image as numpy array
+            input_embedding: Face embedding from InsightFace
 
         Returns:
             Name of recognized person or None if unknown
         """
-        if not DEEPFACE_AVAILABLE or len(self.db.people) == 0:
+        if len(self.db.people) == 0:
             return None
 
         try:
-            # Get embeddings for the input face
-            input_embedding = DeepFace.represent(
-                img_path=face_img,
-                model_name=self.face_model,
-                detector_backend=self.detector_backend,
-                enforce_detection=False
-            )
-
-            if not input_embedding:
-                return None
-
-            input_embedding = np.array(input_embedding[0]["embedding"])
-
             # Compare with known faces
             best_match = None
             best_distance = float('inf')
 
-            # Model-specific thresholds for cosine distance
-            # Using more lenient thresholds for better real-world recognition
-            thresholds = {
-                "VGG-Face": 0.50,
-                "Facenet": 0.50,
-                "Facenet512": 0.45,  # More lenient for webcam variations
-                "OpenFace": 0.15,
-                "DeepFace": 0.30,
-                "DeepID": 0.02,
-                "ArcFace": 0.70,
-                "Dlib": 0.10,
-                "SFace": 0.65
-            }
-            threshold = thresholds.get(self.face_model, 0.50)
+            # InsightFace uses cosine similarity, threshold around 0.4-0.5 for cosine distance
+            threshold = 0.45
 
             for name, person in self.db.people.items():
                 # Get all embeddings for this person (supports multiple samples)
@@ -481,8 +476,7 @@ class FaceRecognitionAgent:
                 # Find best match among all embeddings for this person
                 person_best_distance = float('inf')
                 for known_embedding in embeddings:
-                    # Use cosine distance (more reliable than Euclidean)
-                    # Cosine distance = 1 - cosine similarity
+                    # Use cosine distance
                     dot_product = np.dot(input_embedding, known_embedding)
                     norm_product = np.linalg.norm(input_embedding) * np.linalg.norm(known_embedding)
                     cosine_similarity = dot_product / norm_product
@@ -508,6 +502,33 @@ class FaceRecognitionAgent:
             print(f"Error recognizing face: {e}")
             return None
 
+    def recognize_face(self, face_img: np.ndarray) -> Optional[str]:
+        """
+        Recognize a face against known people in the database.
+
+        Args:
+            face_img: Face image as numpy array
+
+        Returns:
+            Name of recognized person or None if unknown
+        """
+        if self.face_app is None or len(self.db.people) == 0:
+            return None
+
+        try:
+            # Get face from image
+            faces = self.face_app.get(face_img)
+            if not faces:
+                return None
+
+            # Use first face's embedding
+            input_embedding = faces[0].embedding
+            return self.recognize_face_embedding(input_embedding)
+
+        except Exception as e:
+            print(f"Error recognizing face: {e}")
+            return None
+
     def get_face_encoding(self, face_img: np.ndarray) -> Optional[np.ndarray]:
         """
         Get face encoding for storage.
@@ -518,7 +539,7 @@ class FaceRecognitionAgent:
         Returns:
             Face encoding as numpy array or None if failed
         """
-        if not DEEPFACE_AVAILABLE:
+        if self.face_app is None:
             return None
 
         # Validate face image
@@ -532,15 +553,9 @@ class FaceRecognitionAgent:
             return None
 
         try:
-            embedding = DeepFace.represent(
-                img_path=face_img,
-                model_name=self.face_model,
-                detector_backend=self.detector_backend,
-                enforce_detection=False
-            )
-
-            if embedding:
-                return np.array(embedding[0]["embedding"])
+            faces = self.face_app.get(face_img)
+            if faces:
+                return faces[0].embedding
             return None
 
         except Exception as e:
@@ -705,6 +720,7 @@ class FaceRecognitionAgent:
         # Track last recognized person for adding samples
         last_recognized = None
         last_face_img = None
+        last_embedding = None
 
         self._init_camera()
         start_time = datetime.now()
@@ -737,13 +753,18 @@ class FaceRecognitionAgent:
                     # Extract face region
                     face_img = frame[y:y+h, x:x+w]
 
-                    # Try to recognize
-                    recognized_name = self.recognize_face(face_img)
+                    # Use pre-computed embedding from detect_faces
+                    embedding = face_obj.get("embedding")
+                    if embedding is not None:
+                        recognized_name = self.recognize_face_embedding(embedding)
+                    else:
+                        recognized_name = self.recognize_face(face_img)
 
-                    # Track for adding samples
+                    # Track for adding samples (store embedding for efficiency)
                     if recognized_name:
                         last_recognized = recognized_name
                         last_face_img = face_img.copy()
+                        last_embedding = embedding
 
                     # Draw rectangle and label
                     color = (0, 255, 0) if recognized_name else (0, 0, 255)
@@ -780,8 +801,10 @@ class FaceRecognitionAgent:
                                 name = input().strip()
 
                             if name:
-                                # Get face encoding
-                                encoding = self.get_face_encoding(face_img)
+                                # Use pre-computed embedding if available
+                                encoding = face_obj.get("embedding")
+                                if encoding is None:
+                                    encoding = self.get_face_encoding(face_img)
 
                                 # Collect additional information
                                 metadata = await self.collect_person_info(name, frame)
@@ -813,9 +836,16 @@ class FaceRecognitionAgent:
                 key = cv2.waitKey(1) & 0xFF
                 if key == ord('q'):
                     break
-                elif key == ord('a') and last_recognized and last_face_img is not None:
+                elif key == ord('a') and last_recognized:
                     # Add another sample for better recognition
-                    encoding = self.get_face_encoding(last_face_img)
+                    # Use pre-computed embedding if available
+                    if last_embedding is not None:
+                        encoding = last_embedding
+                    elif last_face_img is not None:
+                        encoding = self.get_face_encoding(last_face_img)
+                    else:
+                        encoding = None
+
                     if encoding is not None:
                         if self.db.add_embedding(last_recognized, encoding):
                             print(f"\n✓ Added new face sample for {last_recognized}")
@@ -1006,28 +1036,23 @@ async def main():
     parser.add_argument("--menu", action="store_true", help="Show menu instead of direct start")
     parser.add_argument("--questions", nargs="+", default=["favorite_candy", "interests", "hobby"],
                         help="Questions to ask (default: favorite_candy interests hobby)")
-    parser.add_argument("--face-model", default="Facenet512",
-                        choices=["VGG-Face", "Facenet", "Facenet512", "OpenFace", "DeepFace", "DeepID", "ArcFace", "Dlib", "SFace"],
-                        help="Face recognition model (default: Facenet512)")
     args = parser.parse_args()
 
     print("\n" + "=" * 80)
-    print("FACE RECOGNITION AGENT")
+    print("FACE RECOGNITION AGENT (InsightFace)")
     print("=" * 80)
 
     # Create agent with default questions for both new people and conversations
     agent = FaceRecognitionAgent(
         speech_enabled=not args.no_speech,
         conversation_enabled=True,
-        conversation_questions=args.questions,
-        face_model=args.face_model
+        conversation_questions=args.questions
     )
 
     # Also set pending questions for new people
     for q in args.questions:
         agent.pending_questions.add(q)
 
-    print(f"\n✓ Face model: {args.face_model}")
     print(f"✓ Speech: {'Enabled' if agent.speech_interface else 'Disabled'}")
     print(f"✓ Questions to ask: {', '.join(args.questions)}")
 
