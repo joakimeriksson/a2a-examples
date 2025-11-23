@@ -58,7 +58,7 @@ insightface = ">=0.7.3"
 onnxruntime = ">=1.16.0"
 speechrecognition = ">=3.10.0"
 pywhispercpp = ">=1.2.0"  # Fast whisper.cpp with Metal acceleration on Mac
-pyttsx3 = ">=2.90"
+edge-tts = ">=6.1.0"  # Natural Microsoft voices
 pyaudio = ">=0.2.14"  # Conda lacks osx-arm64 builds, so install from PyPI
 
 [feature.dev.dependencies]

@@ -21,11 +21,19 @@ except ImportError:
     print("Warning: speech_recognition not available. Install with: pip install SpeechRecognition")
 
 try:
+    import edge_tts
+    import asyncio
+    EDGE_TTS_AVAILABLE = True
+except ImportError:
+    EDGE_TTS_AVAILABLE = False
+
+try:
     import pyttsx3
     TTS_AVAILABLE = True
 except ImportError:
     TTS_AVAILABLE = False
-    print("Warning: pyttsx3 not available. Install with: pip install pyttsx3")
+    if not EDGE_TTS_AVAILABLE:
+        print("Warning: No TTS available. Install with: pip install edge-tts")
 
 try:
     from pywhispercpp.model import Model as WhisperModel
@@ -53,7 +61,7 @@ class SpeechInterface:
         whisper_model: str = "small",
         whisper_language: str = "en",
         tts_enabled: bool = True,
-        tts_rate: int = 150,
+        tts_voice: str = "en-US-GuyNeural",
         timeout: int = 5,
         phrase_time_limit: int = 10
     ):
@@ -65,7 +73,7 @@ class SpeechInterface:
             whisper_model: Whisper model size (tiny, base, small, medium, large)
             whisper_language: Language code (en, sv, etc.) or empty for auto-detect
             tts_enabled: Enable text-to-speech
-            tts_rate: Speech rate for TTS (words per minute)
+            tts_voice: Voice for edge-tts (e.g., en-US-GuyNeural, en-GB-SoniaNeural)
             timeout: Seconds to wait for speech to start
             phrase_time_limit: Maximum seconds for a phrase
         """
@@ -73,6 +81,7 @@ class SpeechInterface:
         self.whisper_model_name = whisper_model
         self.whisper_language = whisper_language
         self.tts_enabled = tts_enabled
+        self.tts_voice = tts_voice
         self.timeout = timeout
         self.phrase_time_limit = phrase_time_limit
 
@@ -93,12 +102,13 @@ class SpeechInterface:
             self.whisper_model = WhisperModel(whisper_model)
             print("✓ whisper.cpp model loaded (Metal accelerated on Mac)")
 
-        # Initialize TTS
+        # Initialize TTS - prefer edge-tts for natural voices
+        self.use_edge_tts = tts_enabled and EDGE_TTS_AVAILABLE
         self.tts_engine = None
-        if tts_enabled and TTS_AVAILABLE:
+        if tts_enabled and not EDGE_TTS_AVAILABLE and TTS_AVAILABLE:
             try:
                 self.tts_engine = pyttsx3.init()
-                self.tts_engine.setProperty('rate', tts_rate)
+                self.tts_engine.setProperty('rate', 150)
             except Exception as e:
                 print(f"Warning: Could not initialize TTS: {e}")
                 self.tts_engine = None
@@ -110,14 +120,44 @@ class SpeechInterface:
         Args:
             text: Text to speak
         """
-        if not self.tts_enabled or not self.tts_engine:
+        if not self.tts_enabled:
             return
 
+        if self.use_edge_tts:
+            self._speak_edge_tts(text)
+        elif self.tts_engine:
+            try:
+                self.tts_engine.say(text)
+                self.tts_engine.runAndWait()
+            except Exception as e:
+                print(f"TTS error: {e}")
+
+    def _speak_edge_tts(self, text: str):
+        """Speak using edge-tts (natural Microsoft voices)."""
+        import subprocess
         try:
-            self.tts_engine.say(text)
-            self.tts_engine.runAndWait()
+            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+                temp_path = f.name
+
+            # Generate speech
+            async def generate():
+                communicate = edge_tts.Communicate(text, self.tts_voice)
+                await communicate.save(temp_path)
+
+            asyncio.run(generate())
+
+            # Play audio
+            if os.path.exists(temp_path):
+                # Use afplay on Mac, mpv/ffplay on Linux
+                import platform
+                if platform.system() == "Darwin":
+                    subprocess.run(["afplay", temp_path], check=True)
+                else:
+                    subprocess.run(["ffplay", "-nodisp", "-autoexit", temp_path],
+                                   check=True, capture_output=True)
+                os.remove(temp_path)
         except Exception as e:
-            print(f"TTS error: {e}")
+            print(f"Edge TTS error: {e}")
 
     def listen(self, prompt: str = "", speak_prompt: bool = True) -> Optional[str]:
         """
