@@ -105,6 +105,7 @@ class SpeechInterface:
         # Initialize TTS - prefer edge-tts for natural voices
         self.use_edge_tts = tts_enabled and EDGE_TTS_AVAILABLE
         self.tts_engine = None
+        self._speech_thread = None  # Track current speech to prevent overlap
         if tts_enabled and not EDGE_TTS_AVAILABLE and TTS_AVAILABLE:
             try:
                 self.tts_engine = pyttsx3.init()
@@ -138,6 +139,10 @@ class SpeechInterface:
         import subprocess
         import threading
         try:
+            # Wait for any previous speech to finish (prevent overlap)
+            if self._speech_thread is not None and self._speech_thread.is_alive():
+                self._speech_thread.join()
+
             with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
                 temp_path = f.name
 
@@ -174,6 +179,7 @@ class SpeechInterface:
 
             thread = threading.Thread(target=play_audio, daemon=True)
             thread.start()
+            self._speech_thread = thread  # Track for overlap prevention
 
             # Wait for audio to finish if blocking
             if blocking:
