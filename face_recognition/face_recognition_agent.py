@@ -505,6 +505,12 @@ class FaceRecognitionAgent:
         """
         info = {"name": name}
 
+        # Greet the new person
+        greeting = f"Nice to meet you, {name}!"
+        print(f"\n{greeting}")
+        if self.speech_interface:
+            self.speech_interface.speak(greeting)
+
         # Ask pending questions
         for question_key in self.pending_questions:
             if question_key == "name":
@@ -525,6 +531,12 @@ class FaceRecognitionAgent:
 
             if answer:
                 info[question_key] = answer
+
+        # Thank them
+        thanks = "Thank you! I'll remember you."
+        print(thanks)
+        if self.speech_interface:
+            self.speech_interface.speak(thanks)
 
         return info
 
@@ -885,13 +897,42 @@ class FaceRecognitionAgent:
 
 
 async def main():
-    """Example usage of the Face Recognition Agent."""
-    print("Initializing Face Recognition Agent...")
-    agent = FaceRecognitionAgent()
+    """Main entry point - starts face recognition with conversation mode."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Face Recognition Agent")
+    parser.add_argument("--no-speech", action="store_true", help="Disable speech (text only)")
+    parser.add_argument("--menu", action="store_true", help="Show menu instead of direct start")
+    parser.add_argument("--questions", nargs="+", default=["favorite_candy", "interests", "hobby"],
+                        help="Questions to ask (default: favorite_candy interests hobby)")
+    args = parser.parse_args()
 
     print("\n" + "=" * 80)
-    print("Face Recognition Agent - Test Mode")
+    print("FACE RECOGNITION AGENT")
     print("=" * 80)
+
+    # Create agent with default questions for both new people and conversations
+    agent = FaceRecognitionAgent(
+        speech_enabled=not args.no_speech,
+        conversation_enabled=True,
+        conversation_questions=args.questions
+    )
+
+    # Also set pending questions for new people
+    for q in args.questions:
+        agent.pending_questions.add(q)
+
+    print(f"\n✓ Speech: {'Enabled' if agent.speech_interface else 'Disabled'}")
+    print(f"✓ Questions to ask: {', '.join(args.questions)}")
+
+    # Go directly to face recognition or show menu
+    if not args.menu:
+        print("\nStarting face recognition...")
+        print("Press 's' to save a new person, 'q' to quit")
+        await agent.process_recognition_loop(duration=0)
+        return
+
+    # Show menu if requested
     print("\nOptions:")
     print("  1. Run face recognition loop")
     print("  2. List known people")

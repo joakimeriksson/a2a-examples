@@ -9,8 +9,17 @@ channels = ["conda-forge"]
 platforms = ["linux-64", "osx-arm64", "win-64"]
 
 [tasks]
-# Run the face recognition agent
+# Run the face recognition agent (direct start with speech)
 run = "python face_recognition_agent.py"
+
+# Run with custom questions
+run-custom = { cmd = "python face_recognition_agent.py --questions favorite_food favorite_color favorite_music" }
+
+# Run without speech (text only)
+run-text = "python face_recognition_agent.py --no-speech"
+
+# Run with menu
+run-menu = "python face_recognition_agent.py --menu"
 
 # Start the A2A HTTP server
 server = "python server.py"
