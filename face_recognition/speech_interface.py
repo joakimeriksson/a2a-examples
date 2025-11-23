@@ -28,11 +28,11 @@ except ImportError:
     print("Warning: pyttsx3 not available. Install with: pip install pyttsx3")
 
 try:
-    import whisper
+    from pywhispercpp.model import Model as WhisperModel
     WHISPER_AVAILABLE = True
 except ImportError:
     WHISPER_AVAILABLE = False
-    print("Info: Whisper not available. Using Google Speech Recognition instead.")
+    print("Info: whisper.cpp not available. Using Google Speech Recognition instead.")
 
 
 class SpeechEngine(Enum):
@@ -84,9 +84,9 @@ class SpeechInterface:
         # Initialize Whisper if selected
         self.whisper_model = None
         if engine == SpeechEngine.WHISPER and WHISPER_AVAILABLE:
-            print(f"Loading Whisper model '{whisper_model}'...")
-            self.whisper_model = whisper.load_model(whisper_model)
-            print("Whisper model loaded.")
+            print(f"Loading whisper.cpp model '{whisper_model}'...")
+            self.whisper_model = WhisperModel(whisper_model)
+            print("✓ whisper.cpp model loaded (Metal accelerated on Mac)")
 
         # Initialize TTS
         self.tts_engine = None
@@ -188,7 +188,7 @@ class SpeechInterface:
             return None
 
     def _transcribe_with_whisper(self, audio) -> Optional[str]:
-        """Transcribe audio using OpenAI Whisper."""
+        """Transcribe audio using whisper.cpp (fast, Metal accelerated on Mac)."""
         if not self.whisper_model:
             print("Whisper model not loaded")
             return None
@@ -200,9 +200,9 @@ class SpeechInterface:
                 with open(temp_path, "wb") as wav_file:
                     wav_file.write(audio.get_wav_data())
 
-            # Transcribe with Whisper
-            result = self.whisper_model.transcribe(temp_path)
-            text = result["text"].strip()
+            # Transcribe with whisper.cpp
+            segments = self.whisper_model.transcribe(temp_path)
+            text = ' '.join([segment.text for segment in segments]).strip()
 
             # Clean up
             os.remove(temp_path)
