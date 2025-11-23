@@ -302,7 +302,7 @@ class FaceRecognitionAgent:
         data_dir: str = "people_data",
         det_size: tuple = (640, 640),
         speech_enabled: bool = True,
-        speech_engine: str = "google",
+        speech_engine: str = "whisper",
         tts_enabled: bool = True,
         conversation_enabled: bool = True,
         conversation_questions: Optional[List[str]] = None
@@ -1041,6 +1041,8 @@ async def main():
 
     parser = argparse.ArgumentParser(description="Face Recognition Agent")
     parser.add_argument("--no-speech", action="store_true", help="Disable speech (text only)")
+    parser.add_argument("--speech-engine", default="whisper", choices=["whisper", "google", "sphinx"],
+                        help="Speech recognition engine (default: whisper)")
     parser.add_argument("--menu", action="store_true", help="Show menu instead of direct start")
     parser.add_argument("--questions", nargs="+", default=["favorite_candy", "interests", "hobby"],
                         help="Questions to ask (default: favorite_candy interests hobby)")
@@ -1053,6 +1055,7 @@ async def main():
     # Create agent with default questions for both new people and conversations
     agent = FaceRecognitionAgent(
         speech_enabled=not args.no_speech,
+        speech_engine=args.speech_engine,
         conversation_enabled=True,
         conversation_questions=args.questions
     )
