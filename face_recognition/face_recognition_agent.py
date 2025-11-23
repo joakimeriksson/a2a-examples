@@ -344,6 +344,9 @@ class FaceRecognitionAgent:
         self.last_conversation: Dict[str, float] = {}
         self.conversation_cooldown: int = 300  # 5 minutes between conversations
 
+        # Status for display
+        self.status = "Initializing..."
+
         # Camera
         self.camera = None
 
@@ -628,7 +631,9 @@ class FaceRecognitionAgent:
         greeting = f"Nice to meet you, {name}!"
         print(f"\n{greeting}")
         if self.speech_interface:
+            self.status = "Speaking..."
             self.speech_interface.speak(greeting)
+            self.status = "Ready"
 
         # Ask ONE question for new person (rest will be asked in future sessions)
         for question_key in self.pending_questions:
@@ -638,10 +643,12 @@ class FaceRecognitionAgent:
             # Use speech or text input
             question_text = format_question(question_key)
             if self.speech_interface:
+                self.status = "Listening..."
                 answer = self.speech_interface.ask_question(
                     question_text,
                     allow_text_fallback=True
                 )
+                self.status = "Ready"
             else:
                 print(f"\n{question_text} ", end='', flush=True)
                 answer = input().strip()
@@ -656,7 +663,9 @@ class FaceRecognitionAgent:
         thanks = "Thank you! I'll remember you."
         print(thanks)
         if self.speech_interface:
+            self.status = "Speaking..."
             self.speech_interface.speak(thanks)
+            self.status = "Ready"
 
         return info
 
@@ -685,7 +694,9 @@ class FaceRecognitionAgent:
         print(f"\n{'=' * 60}")
         print(greeting)
         if self.speech_interface:
+            self.status = "Speaking..."
             self.speech_interface.speak(greeting)
+            self.status = "Ready"
 
         new_info = {}
 
@@ -699,10 +710,12 @@ class FaceRecognitionAgent:
             # Ask this ONE question
             question_text = format_question(question_key)
             if self.speech_interface:
+                self.status = "Listening..."
                 answer = self.speech_interface.ask_question(
                     question_text,
                     allow_text_fallback=True
                 )
+                self.status = "Ready"
             else:
                 print(f"{question_text} ", end='', flush=True)
                 answer = input().strip()
@@ -725,7 +738,9 @@ class FaceRecognitionAgent:
         # Say goodbye
         goodbye = "Thanks for chatting!"
         if self.speech_interface:
+            self.status = "Speaking..."
             self.speech_interface.speak(goodbye)
+            self.status = "Ready"
         print(goodbye)
         print("=" * 60 + "\n")
 
@@ -754,7 +769,11 @@ class FaceRecognitionAgent:
         unknown_face_prompted = False
         auto_prompt_delay = 2.0  # seconds
 
+        # Status display
+        self.status = "Initializing..."
+
         self._init_camera()
+        self.status = "Ready"
         start_time = datetime.now()
 
         try:
@@ -853,15 +872,22 @@ class FaceRecognitionAgent:
 
                             # Get name via speech or text
                             if self.speech_interface:
+                                self.status = "Listening for name..."
                                 name = self.speech_interface.ask_question(
                                     "What is your name?",
                                     allow_text_fallback=True
                                 )
+                                self.status = "Ready"
                             else:
                                 print("Please provide the person's name: ", end='', flush=True)
                                 name = input().strip()
 
                             if name:
+                                # Check if face image is valid
+                                if face_img is None or face_img.size == 0:
+                                    print("Face moved out of frame, please try again")
+                                    continue
+
                                 # Use pre-computed embedding if available
                                 encoding = face_obj.get("embedding")
                                 if encoding is None:
@@ -884,11 +910,19 @@ class FaceRecognitionAgent:
 
                                 # Reset pending questions after successful add
                                 self.pending_questions = {"name"}
+                                unknown_face_start = None
 
                         elif key == ord('q'):
                             break
 
                         continue
+
+                # Draw status indicator on frame
+                status_color = (0, 255, 255)  # Yellow
+                cv2.putText(
+                    display_frame, f"Status: {self.status}", (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2
+                )
 
                 # Display frame
                 cv2.imshow('Face Recognition', display_frame)
