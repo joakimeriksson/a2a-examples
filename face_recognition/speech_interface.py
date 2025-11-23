@@ -113,18 +113,19 @@ class SpeechInterface:
                 print(f"Warning: Could not initialize TTS: {e}")
                 self.tts_engine = None
 
-    def speak(self, text: str):
+    def speak(self, text: str, blocking: bool = False):
         """
         Speak text using text-to-speech.
 
         Args:
             text: Text to speak
+            blocking: If True, wait for speech to finish before returning
         """
         if not self.tts_enabled:
             return
 
         if self.use_edge_tts:
-            self._speak_edge_tts(text)
+            self._speak_edge_tts(text, blocking=blocking)
         elif self.tts_engine:
             try:
                 self.tts_engine.say(text)
@@ -132,9 +133,10 @@ class SpeechInterface:
             except Exception as e:
                 print(f"TTS error: {e}")
 
-    def _speak_edge_tts(self, text: str):
+    def _speak_edge_tts(self, text: str, blocking: bool = False):
         """Speak using edge-tts (natural Microsoft voices)."""
         import subprocess
+        import threading
         try:
             with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
                 temp_path = f.name
@@ -155,16 +157,28 @@ class SpeechInterface:
                 # No running loop - use asyncio.run
                 asyncio.run(generate())
 
-            # Play audio
-            if os.path.exists(temp_path):
-                # Use afplay on Mac, mpv/ffplay on Linux
-                import platform
-                if platform.system() == "Darwin":
-                    subprocess.run(["afplay", temp_path], check=True)
-                else:
-                    subprocess.run(["ffplay", "-nodisp", "-autoexit", temp_path],
-                                   check=True, capture_output=True)
-                os.remove(temp_path)
+            # Play audio in background thread to avoid blocking UI
+            def play_audio():
+                try:
+                    if os.path.exists(temp_path):
+                        # Use afplay on Mac, ffplay on Linux
+                        import platform
+                        if platform.system() == "Darwin":
+                            subprocess.run(["afplay", temp_path], check=True)
+                        else:
+                            subprocess.run(["ffplay", "-nodisp", "-autoexit", temp_path],
+                                           check=True, capture_output=True)
+                        os.remove(temp_path)
+                except Exception as e:
+                    print(f"Audio playback error: {e}")
+
+            thread = threading.Thread(target=play_audio, daemon=True)
+            thread.start()
+
+            # Wait for audio to finish if blocking
+            if blocking:
+                thread.join()
+
         except Exception as e:
             print(f"Edge TTS error: {e}")
 
@@ -187,7 +201,7 @@ class SpeechInterface:
         if prompt:
             print(f"\n{prompt}")
             if speak_prompt:
-                self.speak(prompt)
+                self.speak(prompt, blocking=True)  # Wait for prompt to finish before listening
 
         print("🎤 Listening... (speak now)")
 
