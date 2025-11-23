@@ -266,7 +266,8 @@ class SpeechInterface:
 
             # Filter out placeholder tokens (indicates no speech detected)
             placeholders = ['[BLANK_AUDIO]', '[Clinking]', '[Music]', '[Applause]',
-                           '[Laughter]', '[Silence]', '[ Silence ]', '[INAUDIBLE]']
+                           '[Laughter]', '[Silence]', '[ Silence ]', '[INAUDIBLE]',
+                           '[CLICK]', '[ Click ]', '[Click]']
             for ph in placeholders:
                 text = text.replace(ph, '').strip()
 

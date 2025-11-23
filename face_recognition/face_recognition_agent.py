@@ -431,6 +431,16 @@ class FaceRecognitionAgent:
             results = []
             for face in faces:
                 bbox = face.bbox.astype(int)
+
+                # Get gaze/attention info from pose (yaw, pitch, roll)
+                looking_at_camera = False
+                pose = getattr(face, 'pose', None)
+                if pose is not None:
+                    yaw, pitch, roll = pose
+                    # Person is looking at camera if yaw and pitch are small
+                    # Yaw: left/right rotation, Pitch: up/down rotation
+                    looking_at_camera = abs(yaw) < 20 and abs(pitch) < 20
+
                 results.append({
                     "facial_area": {
                         "x": int(bbox[0]),
@@ -439,7 +449,9 @@ class FaceRecognitionAgent:
                         "h": int(bbox[3] - bbox[1])
                     },
                     "embedding": face.embedding,
-                    "det_score": float(face.det_score)
+                    "det_score": float(face.det_score),
+                    "looking_at_camera": looking_at_camera,
+                    "pose": pose.tolist() if pose is not None else None
                 })
             return results
         except Exception as e:
@@ -618,7 +630,7 @@ class FaceRecognitionAgent:
         if self.speech_interface:
             self.speech_interface.speak(greeting)
 
-        # Ask pending questions
+        # Ask ONE question for new person (rest will be asked in future sessions)
         for question_key in self.pending_questions:
             if question_key == "name":
                 continue  # Already have the name
@@ -636,6 +648,9 @@ class FaceRecognitionAgent:
 
             if answer:
                 info[question_key] = answer
+
+            # Only ask ONE question
+            break
 
         # Thank them
         thanks = "Thank you! I'll remember you."
@@ -674,14 +689,14 @@ class FaceRecognitionAgent:
 
         new_info = {}
 
-        # Ask conversation questions
+        # Ask ONE question per session (rotate through unanswered questions)
+        person = self.db.get_person(name)
         for question_key in self.conversation_questions:
             # Check if we already have this info
-            person = self.db.get_person(name)
             if person and question_key in person.metadata:
                 continue  # Skip if we already know
 
-            # Ask the question
+            # Ask this ONE question
             question_text = format_question(question_key)
             if self.speech_interface:
                 answer = self.speech_interface.ask_question(
@@ -694,11 +709,15 @@ class FaceRecognitionAgent:
 
             if answer:
                 new_info[question_key] = answer
+                # Update database immediately
+                self.db.update_person(name, new_info)
+                print(f"✓ Learned: {question_key} = {answer}")
 
-        # Update database if we got new info
-        if new_info:
-            self.db.update_person(name, new_info)
-            print(f"✓ Updated information for {name}")
+            # Only ask ONE question per session
+            break
+
+        if not new_info:
+            print("(Already know everything about you!)")
 
         # Update last conversation time
         self.last_conversation[name] = current_time
@@ -729,6 +748,11 @@ class FaceRecognitionAgent:
         last_recognized = None
         last_face_img = None
         last_embedding = None
+
+        # Track unknown face for auto-prompt
+        unknown_face_start = None
+        unknown_face_prompted = False
+        auto_prompt_delay = 2.0  # seconds
 
         self._init_camera()
         start_time = datetime.now()
@@ -775,10 +799,14 @@ class FaceRecognitionAgent:
                         last_embedding = embedding
 
                     # Draw rectangle and label
+                    looking = face_obj.get("looking_at_camera", False)
                     color = (0, 255, 0) if recognized_name else (0, 0, 255)
                     cv2.rectangle(display_frame, (x, y), (x+w, y+h), color, 2)
 
+                    # Show name and attention status
                     label = recognized_name if recognized_name else "Unknown"
+                    if looking:
+                        label += " [A]"  # Attention indicator
                     cv2.putText(
                         display_frame, label, (x, y-10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2
@@ -788,15 +816,40 @@ class FaceRecognitionAgent:
                     if recognized_name and self.conversation_enabled and self.conversation_questions:
                         # Trigger conversation (will check cooldown internally)
                         await self.have_conversation(recognized_name)
+                        # Reset unknown tracking
+                        unknown_face_start = None
+                        unknown_face_prompted = False
+
+                    # Track unknown face for auto-prompt
+                    if not recognized_name and len(faces) == 1:
+                        import time
+                        current_time = time.time()
+
+                        if unknown_face_start is None:
+                            unknown_face_start = current_time
+                            unknown_face_prompted = False
+
+                        # Auto-prompt after 2 seconds of continuous unknown face
+                        elapsed = current_time - unknown_face_start
+                        auto_trigger = elapsed >= auto_prompt_delay and not unknown_face_prompted
+                    else:
+                        # Reset tracking if no unknown face
+                        unknown_face_start = None
+                        unknown_face_prompted = False
+                        auto_trigger = False
 
                     # If unknown face detected, offer to add
                     if not recognized_name and len(faces) == 1:  # Only one face
                         cv2.imshow('Face Recognition', display_frame)
                         key = cv2.waitKey(1) & 0xFF
 
-                        if key == ord('s'):  # Save this person
+                        if key == ord('s') or auto_trigger:  # Manual or auto save
+                            unknown_face_prompted = True
                             print("\n" + "-" * 80)
-                            print("New person detected!")
+                            if auto_trigger:
+                                print("Unknown face detected for 2+ seconds!")
+                            else:
+                                print("New person detected!")
 
                             # Get name via speech or text
                             if self.speech_interface:
