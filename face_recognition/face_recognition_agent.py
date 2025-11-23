@@ -347,8 +347,9 @@ class FaceRecognitionAgent:
         # Status for display
         self.status = "Initializing..."
 
-        # Camera
+        # Camera and current frame for UI updates
         self.camera = None
+        self.current_frame = None
 
         # Initialize InsightFace
         self.face_app = None
@@ -399,6 +400,25 @@ class FaceRecognitionAgent:
         if self.camera is not None:
             self.camera.release()
             self.camera = None
+
+    def _show_listening_indicator(self, frame: np.ndarray, message: str = "LISTENING..."):
+        """Draw a prominent listening indicator on the frame and display it."""
+        display = frame.copy()
+
+        # Draw semi-transparent overlay at top
+        overlay = display.copy()
+        cv2.rectangle(overlay, (0, 0), (display.shape[1], 80), (0, 100, 0), -1)
+        cv2.addWeighted(overlay, 0.7, display, 0.3, 0, display)
+
+        # Draw ear symbol and text
+        cv2.putText(
+            display, f"[EAR] {message}", (20, 55),
+            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3
+        )
+
+        # Show the frame
+        cv2.imshow('Face Recognition', display)
+        cv2.waitKey(1)  # Force display update
 
     def capture_frame(self) -> Optional[np.ndarray]:
         """
@@ -644,6 +664,8 @@ class FaceRecognitionAgent:
             question_text = format_question(question_key)
             if self.speech_interface:
                 self.status = "Listening..."
+                if self.current_frame is not None:
+                    self._show_listening_indicator(self.current_frame, "LISTENING...")
                 answer = self.speech_interface.ask_question(
                     question_text,
                     allow_text_fallback=True
@@ -711,6 +733,8 @@ class FaceRecognitionAgent:
             question_text = format_question(question_key)
             if self.speech_interface:
                 self.status = "Listening..."
+                if self.current_frame is not None:
+                    self._show_listening_indicator(self.current_frame, "LISTENING...")
                 answer = self.speech_interface.ask_question(
                     question_text,
                     allow_text_fallback=True
@@ -788,6 +812,9 @@ class FaceRecognitionAgent:
                     print("Failed to capture frame")
                     await asyncio.sleep(1)
                     continue
+
+                # Store for use in other methods
+                self.current_frame = frame
 
                 # Detect faces
                 faces = self.detect_faces(frame)
@@ -873,6 +900,7 @@ class FaceRecognitionAgent:
                             # Get name via speech or text
                             if self.speech_interface:
                                 self.status = "Listening for name..."
+                                self._show_listening_indicator(display_frame, "LISTENING - Say your name...")
                                 name = self.speech_interface.ask_question(
                                     "What is your name?",
                                     allow_text_fallback=True
