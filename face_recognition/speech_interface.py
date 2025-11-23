@@ -59,7 +59,7 @@ class SpeechInterface:
         self,
         engine: SpeechEngine = SpeechEngine.GOOGLE,
         whisper_model: str = "small",
-        whisper_language: str = "en",
+        whisper_language: str = "",  # Empty for auto-detect (multilingual)
         tts_enabled: bool = True,
         tts_voice: str = "en-US-GuyNeural",
         timeout: int = 5,
@@ -144,7 +144,16 @@ class SpeechInterface:
                 communicate = edge_tts.Communicate(text, self.tts_voice)
                 await communicate.save(temp_path)
 
-            asyncio.run(generate())
+            # Handle both running and new event loops
+            try:
+                loop = asyncio.get_running_loop()
+                # Already in async context - create task
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    pool.submit(asyncio.run, generate()).result()
+            except RuntimeError:
+                # No running loop - use asyncio.run
+                asyncio.run(generate())
 
             # Play audio
             if os.path.exists(temp_path):
@@ -245,8 +254,11 @@ class SpeechInterface:
                 with open(temp_path, "wb") as wav_file:
                     wav_file.write(audio.get_wav_data(convert_rate=16000))
 
-            # Transcribe with whisper.cpp
-            segments = self.whisper_model.transcribe(temp_path, language=self.whisper_language)
+            # Transcribe with whisper.cpp (empty language = auto-detect)
+            if self.whisper_language:
+                segments = self.whisper_model.transcribe(temp_path, language=self.whisper_language)
+            else:
+                segments = self.whisper_model.transcribe(temp_path)
             text = ' '.join([segment.text for segment in segments]).strip()
 
             # Clean up
