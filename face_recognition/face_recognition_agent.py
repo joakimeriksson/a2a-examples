@@ -1006,6 +1006,9 @@ async def main():
     parser.add_argument("--menu", action="store_true", help="Show menu instead of direct start")
     parser.add_argument("--questions", nargs="+", default=["favorite_candy", "interests", "hobby"],
                         help="Questions to ask (default: favorite_candy interests hobby)")
+    parser.add_argument("--face-model", default="Facenet512",
+                        choices=["VGG-Face", "Facenet", "Facenet512", "OpenFace", "DeepFace", "DeepID", "ArcFace", "Dlib", "SFace"],
+                        help="Face recognition model (default: Facenet512)")
     args = parser.parse_args()
 
     print("\n" + "=" * 80)
@@ -1016,14 +1019,16 @@ async def main():
     agent = FaceRecognitionAgent(
         speech_enabled=not args.no_speech,
         conversation_enabled=True,
-        conversation_questions=args.questions
+        conversation_questions=args.questions,
+        face_model=args.face_model
     )
 
     # Also set pending questions for new people
     for q in args.questions:
         agent.pending_questions.add(q)
 
-    print(f"\n✓ Speech: {'Enabled' if agent.speech_interface else 'Disabled'}")
+    print(f"\n✓ Face model: {args.face_model}")
+    print(f"✓ Speech: {'Enabled' if agent.speech_interface else 'Disabled'}")
     print(f"✓ Questions to ask: {', '.join(args.questions)}")
 
     # Go directly to face recognition or show menu
