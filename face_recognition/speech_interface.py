@@ -50,7 +50,8 @@ class SpeechInterface:
     def __init__(
         self,
         engine: SpeechEngine = SpeechEngine.GOOGLE,
-        whisper_model: str = "base",
+        whisper_model: str = "small",
+        whisper_language: str = "en",
         tts_enabled: bool = True,
         tts_rate: int = 150,
         timeout: int = 5,
@@ -62,6 +63,7 @@ class SpeechInterface:
         Args:
             engine: Speech recognition engine to use
             whisper_model: Whisper model size (tiny, base, small, medium, large)
+            whisper_language: Language code (en, sv, etc.) or empty for auto-detect
             tts_enabled: Enable text-to-speech
             tts_rate: Speech rate for TTS (words per minute)
             timeout: Seconds to wait for speech to start
@@ -69,6 +71,7 @@ class SpeechInterface:
         """
         self.engine = engine
         self.whisper_model_name = whisper_model
+        self.whisper_language = whisper_language
         self.tts_enabled = tts_enabled
         self.timeout = timeout
         self.phrase_time_limit = phrase_time_limit
@@ -201,7 +204,7 @@ class SpeechInterface:
                     wav_file.write(audio.get_wav_data(convert_rate=16000))
 
             # Transcribe with whisper.cpp
-            segments = self.whisper_model.transcribe(temp_path)
+            segments = self.whisper_model.transcribe(temp_path, language=self.whisper_language)
             text = ' '.join([segment.text for segment in segments]).strip()
 
             # Clean up
