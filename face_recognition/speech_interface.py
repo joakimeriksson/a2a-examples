@@ -58,7 +58,7 @@ class SpeechInterface:
     def __init__(
         self,
         engine: SpeechEngine = SpeechEngine.GOOGLE,
-        whisper_model: str = "small",
+        whisper_model: str = "medium",  # Better for multilingual
         whisper_language: str = "",  # Empty for auto-detect (multilingual)
         tts_enabled: bool = True,
         tts_voice: str = "en-US-GuyNeural",
@@ -261,8 +261,14 @@ class SpeechInterface:
                 segments = self.whisper_model.transcribe(temp_path)
             text = ' '.join([segment.text for segment in segments]).strip()
 
-            # Clean up
+            # Clean up temp file
             os.remove(temp_path)
+
+            # Filter out placeholder tokens (indicates no speech detected)
+            placeholders = ['[BLANK_AUDIO]', '[Clinking]', '[Music]', '[Applause]',
+                           '[Laughter]', '[Silence]', '[ Silence ]', '[INAUDIBLE]']
+            for ph in placeholders:
+                text = text.replace(ph, '').strip()
 
             return text if text else None
 
