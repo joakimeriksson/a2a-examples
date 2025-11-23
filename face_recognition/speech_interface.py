@@ -194,11 +194,11 @@ class SpeechInterface:
             return None
 
         try:
-            # Save audio to temporary WAV file
+            # Save audio to temporary WAV file at 16kHz (required by whisper.cpp)
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
                 temp_path = f.name
                 with open(temp_path, "wb") as wav_file:
-                    wav_file.write(audio.get_wav_data())
+                    wav_file.write(audio.get_wav_data(convert_rate=16000))
 
             # Transcribe with whisper.cpp
             segments = self.whisper_model.transcribe(temp_path)
